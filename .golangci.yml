@@ -1,0 +1,23 @@
+issues:
+  exclude-rules:
+    - path: ".*\\/main_test.go$"
+      linters:
+        - exhaustruct
+        - tparallel
+        - paralleltest
+linters:
+  disable:
+    - depguard
+    - gci
+    # - gofumpt
+    # - govet
+    - varnamelen
+    - wrapcheck # because it's simply stupid
+    - funlen
+    - lll # because it's 21st century
+    # - execinquery # deprecated
+    # - gomnd # deprecated
+    - dupl # because too much factorisation reduces readability
+    - exportloopref # deprecated
+    - ireturn
+  enable-all: true

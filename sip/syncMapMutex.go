@@ -1,0 +1,67 @@
+/*
+# Software Name : Session Router (SR)
+# SPDX-FileCopyrightText: Copyright (c) Orange Business - OINIS/Services/NSF
+# SPDX-License-Identifier: Apache-2.0
+#
+# This software is distributed under the Apache-2.0
+# See the "LICENSES" directory for more details.
+#
+# Authors:
+# - Moatassem Talaat <moatassem.talaat@orange.com>
+
+---
+*/
+
+package sip
+
+import (
+	. "SRGo/global"
+	"sync"
+)
+
+type ConcurrentMapMutex struct {
+	_map map[string]*SipSession
+	mu   sync.RWMutex
+}
+
+func NewConcurrentMapMutex() ConcurrentMapMutex {
+	return ConcurrentMapMutex{_map: make(map[string]*SipSession)}
+}
+
+func (c *ConcurrentMapMutex) Store(ky string, ss *SipSession) (ok bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	ok = true
+	if ss.Direction == INBOUND && !CallLimiter.AcceptNewCall() {
+		ok = false
+	}
+	c._map[ky] = ss
+	Prometrics.ConSessions.Inc()
+	return
+}
+
+func (c *ConcurrentMapMutex) Delete(ky string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c._map, ky)
+	Prometrics.ConSessions.Dec()
+}
+
+func (c *ConcurrentMapMutex) Load(ky string) (*SipSession, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	s, ok := c._map[ky]
+	return s, ok
+}
+
+func (c *ConcurrentMapMutex) Range() map[string]*SipSession {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c._map
+}
+
+func (c *ConcurrentMapMutex) IsEmpty() bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c._map) == 0
+}
