@@ -16,7 +16,6 @@ package sip
 
 import (
 	. "SRGo/global"
-	"SRGo/phone"
 	"SRGo/q850"
 	"SRGo/sip/mode"
 	"SRGo/sip/state"
@@ -421,11 +420,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 		switch sipmsg.GetMethod() {
 		case INVITE:
 			ss.SendResponse(trans, status.Trying, EmptyBody())
-			if SkipAS {
-				ss.RouteRequestInternal(trans, sipmsg) // use internal AS
-				return
-			}
-			ss.RouteRequest(trans, sipmsg)
+			ss.RouteRequestInternal(trans, sipmsg)
 		case ReINVITE:
 			ss.SendResponse(trans, 100, EmptyBody())
 			lnkdss := ss.LinkedSession
@@ -535,17 +530,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			if lnkdss := ss.LinkedSession; lnkdss != nil {
 				lnkdss.SendRequest(INFO, trans, *sipmsg.Body)
 			}
-		case REGISTER:
-			contact, ext, ruri, ipport, expires := sipmsg.GetRegistrationData()
-			defer ss.DropMe()
-			if expires < 0 {
-				ss.SetState(state.Dropped)
-				ss.SendResponseDetailed(trans, NewResponsePackRFWarning(400, "", "Bad Contact header"), EmptyBody())
-				return
-			}
-			ss.SetState(phone.Phones.AddOrUpdate(ext, ruri, ipport, expires))
-			ss.SendResponseDetailed(trans, ResponsePack{StatusCode: 200, ContactHeader: contact}, EmptyBody())
-		default: // SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
+		default: // REGISTER, SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
 			ss.SetState(state.Dropped)
 			ss.SendResponse(trans, status.MethodNotAllowed, EmptyBody())
 			ss.DropMe()

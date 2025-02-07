@@ -20,16 +20,15 @@ import (
 	"SRGo/sip"
 	"SRGo/webserver"
 	"fmt"
-	"net"
 	"os"
 )
 
 // environment variables
 const (
-	AS_SIP_UdpIpPort string = "as_sip_udp"
-	Own_IP_IPv4      string = "server_ipv4"
-	Own_SIP_UdpPort  string = "sip_udp_port"
-	Own_Http_Port    string = "http_port"
+	Own_IP_IPv4     string = "server_ipv4"
+	Own_SIP_UdpPort string = "sip_udp_port"
+	Own_Http_Port   string = "http_port"
+	Media_Path      string = "media_path"
 )
 
 // use this for initializations
@@ -49,24 +48,8 @@ func greeting() {
 	fmt.Printf("Welcome to %s - Product of %s 2025\n", global.B2BUAName, global.ASCIIPascal(global.EntityName))
 }
 
-func checkArgs() (udpskt *net.UDPAddr, ipv4 string, sipuport, httpport int) {
-	siplyr, ok := os.LookupEnv(AS_SIP_UdpIpPort)
-	if !ok {
-		fmt.Println("No AS address provided! - switching to built-in AS")
-		goto skipAS
-	}
-
-	{
-		var err error
-		udpskt, err = global.GetUDPSocket(siplyr)
-		if err != nil {
-			os.Exit(1)
-		}
-		fmt.Printf("AS Routing: [%s]\n", siplyr)
-	}
-
-skipAS:
-	ipv4, ok = os.LookupEnv(Own_IP_IPv4)
+func checkArgs() (ipv4 string, sipuport, httpport int) {
+	ipv4, ok := os.LookupEnv(Own_IP_IPv4)
 	if !ok {
 		fmt.Println("No self IPv4 address provided!")
 		os.Exit(1)
@@ -84,6 +67,11 @@ skipAS:
 		httpport = global.Str2int[int](hp)
 	} else {
 		httpport = 8080
+	}
+
+	mp, ok := os.LookupEnv(Media_Path)
+	if ok {
+		global.MediaPath = mp
 	}
 
 	return

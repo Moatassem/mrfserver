@@ -16,7 +16,6 @@ package sip
 
 import (
 	. "SRGo/global"
-	"SRGo/phone"
 	"SRGo/q850"
 	"SRGo/sip/ivr"
 	"SRGo/sip/state"
@@ -35,89 +34,6 @@ func getURIUsername(uri string) string {
 	return ""
 }
 
-func (ss1 *SipSession) RouteRequest(trans1 *Transaction, sipmsg1 *SipMessage) {
-	defer func() {
-		if r := recover(); r != nil {
-			LogCallStack(r)
-		}
-	}()
-
-	if ss1.RoutingData == nil { //first invocation
-		ss1.RoutingData = &RoutingData{NoAnswerTimeout: 180, No18xTimeout: 60, MaxCallDuration: 0, RURIUsername: sipmsg1.StartLine.UserPart}
-		isCallerPhone := phone.Phones.IsPhoneExt(getURIUsername(sipmsg1.FromHeader))
-		if isCallerPhone {
-			ss1.RoutingData.RemoteUDP = ASUserAgent.UDPAddr
-			sipmsg1.AddRequestedBodyParts()
-			// if !sipmsg1.KeepOnlyBodyPart(SDP) {
-			// 	ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotAvailable, "no remaining body")
-			// 	return
-			// }
-		} else if phone, ok := phone.Phones.Get(ss1.RoutingData.RURIUsername); ok {
-			ss1.RoutingData.RemoteUDP = phone.UA.UDPAddr
-			if !phone.IsRegistered {
-				ss1.RejectMe(trans1, status.TemporarilyUnavailable, q850.NoAnswerFromUser, "target not registered")
-				return
-			}
-			if !phone.IsReachable {
-				ss1.RejectMe(trans1, status.DoesNotExistAnywhere, q850.NoRouteToDestination, "target not reachable")
-				return
-			}
-			if !phone.UA.IsAlive {
-				ss1.RejectMe(trans1, status.TemporarilyUnavailable, q850.NetworkOutOfOrder, "target not alive")
-				return
-			}
-			if !sipmsg1.KeepOnlyBodyPart(SDP) {
-				ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotAvailable, "no remaining body")
-				return
-			}
-		} else {
-			ss1.RoutingData.RemoteUDP = ASUserAgent.UDPAddr
-			// ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
-			// return
-		}
-		// if err := initial(sipmsg1, ss1.RoutingData); err != nil {
-		// 	LogError(LTConfiguration, err.Error())
-		// 	ss1.RejectMe(trans1, status.ServiceUnavailable, q850.ExchangeRoutingError, "Routing failure")
-		// 	return
-		// }
-	}
-
-	// set body in ss1 that will be sent to ss2 after processing
-	ss1.RemoteBody = *sipmsg1.Body
-
-	rd := ss1.RoutingData
-
-	// if isMRF && ss1.IsBeingEstablished() && ss1.IsDelayedOfferCall && !trans1.RequestMessage.IsMethodAllowed(UPDATE) {
-	// 	ss1.RejectMe(trans1, status.ServiceUnavailable, q850.InterworkingUnspecified, "Delayed offer with no UPDATE support for MRF")
-	// 	return
-	// }
-
-	ss2 := NewSS(OUTBOUND)
-	// ss2.RemoteUDP = ss1.RemoteUDP
-	ss2.RemoteUDP = rd.RemoteUDP
-	ss2.UDPListenser = ss1.UDPListenser
-	ss2.RoutingData = rd
-	ss2.IsDelayedOfferCall = ss1.IsDelayedOfferCall
-
-	ss2.LinkedSession = ss1
-	ss1.LinkedSession = ss2
-
-	trans2, _ := ss2.CreateLinkedINVITE(rd.RURIUsername, ss1.RemoteBody)
-
-	ss2.IsPRACKSupported = ss1.IsPRACKSupported
-	//TODO - return target and prefix .. ex. cdpn:+201223309859, prefix: 042544154
-	//To header to contain cdpn & ruri-userpart to contain "+" + prefix + cdpn
-	// sipmsg2.TranslateRM(ss2, trans2, numtype.CalledRURI, rd.RURIUsername)
-
-	if !ss1.IsBeingEstablished() {
-		return
-	}
-
-	ss2.SetState(state.BeingEstablished)
-	ss2.AddMe()
-	ss2.SendSTMessage(trans2)
-}
-
 func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMessage) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -126,28 +42,6 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 	}()
 
 	upart := sipmsg1.StartLine.UserPart
-
-	if phone, ok := phone.Phones.Get(upart); ok {
-		ss1.RoutingData = &RoutingData{NoAnswerTimeout: 10, No18xTimeout: 15, MaxCallDuration: 7200, RURIUsername: upart}
-		ss1.RoutingData.RemoteUDP = phone.UA.UDPAddr
-		if !phone.IsRegistered {
-			ss1.RejectMe(trans1, status.TemporarilyUnavailable, q850.NoAnswerFromUser, "target not registered")
-			return
-		}
-		if !phone.IsReachable {
-			ss1.RejectMe(trans1, status.DoesNotExistAnywhere, q850.NoRouteToDestination, "target not reachable")
-			return
-		}
-		if !phone.UA.IsAlive {
-			ss1.RejectMe(trans1, status.TemporarilyUnavailable, q850.NetworkOutOfOrder, "target not alive")
-			return
-		}
-		if !sipmsg1.KeepOnlyBodyPart(SDP) {
-			ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotAvailable, "no remaining body")
-			return
-		}
-		goto routeCall
-	}
 
 	if !sipmsg1.Body.ContainsSDP() {
 		ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP or delay offer")
@@ -160,43 +54,7 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 	}
 
 	ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
-	return
 
-routeCall:
-	// set body in ss1 that will be sent to ss2 after processing
-	ss1.RemoteBody = *sipmsg1.Body
-
-	rd := ss1.RoutingData
-
-	// if isMRF && ss1.IsBeingEstablished() && ss1.IsDelayedOfferCall && !trans1.RequestMessage.IsMethodAllowed(UPDATE) {
-	// 	ss1.RejectMe(trans1, status.ServiceUnavailable, q850.InterworkingUnspecified, "Delayed offer with no UPDATE support for MRF")
-	// 	return
-	// }
-
-	ss2 := NewSS(OUTBOUND)
-	// ss2.RemoteUDP = ss1.RemoteUDP
-	ss2.RemoteUDP = rd.RemoteUDP
-	ss2.UDPListenser = ss1.UDPListenser
-	ss2.RoutingData = rd
-	ss2.IsDelayedOfferCall = ss1.IsDelayedOfferCall
-
-	ss2.LinkedSession = ss1
-	ss1.LinkedSession = ss2
-
-	trans2, _ := ss2.CreateLinkedINVITE(rd.RURIUsername, ss1.RemoteBody)
-
-	ss2.IsPRACKSupported = ss1.IsPRACKSupported
-	//TODO - return target and prefix .. ex. cdpn:+201223309859, prefix: 042544154
-	//To header to contain cdpn & ruri-userpart to contain "+" + prefix + cdpn
-	// sipmsg2.TranslateRM(ss2, trans2, numtype.CalledRURI, rd.RURIUsername)
-
-	if !ss1.IsBeingEstablished() {
-		return
-	}
-
-	ss2.SetState(state.BeingEstablished)
-	ss2.AddMe()
-	ss2.SendSTMessage(trans2)
 }
 
 func (ss1 *SipSession) RerouteRequest(rspnspk ResponsePack) {

@@ -17,26 +17,20 @@ package sip
 import (
 	"SRGo/cl"
 	. "SRGo/global"
-	"SRGo/phone"
+	"SRGo/sip/ivr"
 	"fmt"
 	"net"
 	"os"
 	"runtime"
-	"time"
 )
 
 var (
-	Sessions    ConcurrentMapMutex
-	ASUserAgent *SipUdpUserAgent
-	SkipAS      bool
+	Sessions ConcurrentMapMutex
 )
 
-func StartServer(asUdpskt *net.UDPAddr, ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
+func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
 	fmt.Print("Initializing Global Parameters...")
 	Sessions = NewConcurrentMapMutex()
-
-	SkipAS = asUdpskt == nil
-	ASUserAgent = NewSipUdpUserAgent(asUdpskt)
 
 	SipUdpPort = sup
 	HttpTcpPort = htp
@@ -79,6 +73,8 @@ func StartServer(asUdpskt *net.UDPAddr, ipv4 string, sup, htp int) (*net.UDPConn
 	// 	fmt.Println("Selected:", serverIP)
 	// }
 
+	ivr.IVRsRepo = ivr.NewIVRs()
+
 	serverIP := net.ParseIP(ipv4)
 
 	fmt.Print("Attempting to listen on SIP...")
@@ -90,9 +86,6 @@ func StartServer(asUdpskt *net.UDPAddr, ipv4 string, sup, htp int) (*net.UDPConn
 	startWorkers(serverUDPListener)
 	udpLoopWorkers(serverUDPListener)
 	fmt.Println("Success: UDP", serverUDPListener.LocalAddr().String())
-
-	// starting probing loop
-	go periodicUAProbing(serverUDPListener)
 
 	fmt.Print("Setting Rate Limiter...")
 	CallLimiter = cl.NewCallLimiter(RateLimit, Prometrics, &WtGrp)
@@ -180,18 +173,4 @@ func processPacket(packet Packet, conn *net.UDPConn) {
 		pdu = pdutmp
 	}
 	BufferPool.Put(packet.buffer)
-}
-
-func periodicUAProbing(conn *net.UDPConn) {
-	WtGrp.Add(1)
-	defer WtGrp.Done()
-	ticker := time.NewTicker(5 * time.Second)
-	for range ticker.C {
-		ProbeUA(conn, ASUserAgent)
-		for _, phne := range phone.Phones.All() {
-			if phne.IsReachable && phne.IsRegistered {
-				ProbeUA(conn, phne.UA)
-			}
-		}
-	}
 }

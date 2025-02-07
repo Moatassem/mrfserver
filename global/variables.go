@@ -43,6 +43,8 @@ var (
 	HttpTcpPort int
 	RateLimit   int = -1 //TODO 2000 || 0 = switched off, -1 = unlimited, > 0 = limited
 
+	MediaPath string
+
 	BufferPool  *sync.Pool
 	Prometrics  *prometheus.Metrics
 	CallLimiter *cl.CallLimiter

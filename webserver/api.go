@@ -16,7 +16,6 @@ package webserver
 
 import (
 	. "SRGo/global"
-	"SRGo/phone"
 	"SRGo/sip"
 	"encoding/json"
 	"fmt"
@@ -33,7 +32,6 @@ func StartWS(ip net.IP) {
 	srv := &http.Server{Addr: ws, Handler: r, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 15 * time.Second}
 
 	r.HandleFunc("GET /api/v1/session", serveSession)
-	r.HandleFunc("GET /api/v1/phone", servePhone)
 	r.HandleFunc("GET /api/v1/stats", serveStats)
 	r.Handle("GET /metrics", Prometrics.Handler())
 	r.HandleFunc("GET /", serveHome)
@@ -99,21 +97,6 @@ func serveStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response, _ := json.Marshal(data)
-	_, err := w.Write(response)
-	if err != nil {
-		LogError(LTWebserver, err.Error())
-	}
-}
-
-func servePhone(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-
-	var phns []*phone.IPPhone
-	for _, phn := range phone.Phones.All() {
-		phns = append(phns, phn)
-	}
-
-	response, _ := json.Marshal(phns)
 	_, err := w.Write(response)
 	if err != nil {
 		LogError(LTWebserver, err.Error())
