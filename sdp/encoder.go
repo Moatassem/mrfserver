@@ -179,7 +179,7 @@ func (w writer) format(f *Format) writer {
 	p := int64(f.Payload)
 	if f.Name != "" {
 		w = w.add('a').str("rtpmap:").int(p).sp().str(f.Name).char('/').int(int64(f.ClockRate))
-		if f.Channels > 0 {
+		if f.Channels > 1 {
 			w = w.char('/').int(int64(f.Channels))
 		}
 	}

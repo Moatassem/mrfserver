@@ -33,6 +33,13 @@ func EmptyBody() MessageBody {
 	return mb
 }
 
+func NewMessageBody(init bool) *MessageBody {
+	if init {
+		return &MessageBody{PartsContents: make(map[BodyType]ContentPart)}
+	}
+	return new(MessageBody)
+}
+
 func NewContentPart(bt BodyType, bytes []byte) ContentPart {
 	var ct ContentPart
 	ct.Bytes = bytes

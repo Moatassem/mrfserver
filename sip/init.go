@@ -83,6 +83,8 @@ func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
 		fmt.Println(err)
 		os.Exit(2)
 	}
+	ServerIPv4 = serverIP.String()
+
 	startWorkers(serverUDPListener)
 	udpLoopWorkers(serverUDPListener)
 	fmt.Println("Success: UDP", serverUDPListener.LocalAddr().String())

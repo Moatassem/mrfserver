@@ -74,8 +74,8 @@ func GenerateUDPSocket(conn *net.UDPConn) *net.UDPAddr {
 	return conn.LocalAddr().(*net.UDPAddr)
 }
 
-func GetUDPSocket(ipt string) (*net.UDPAddr, error) {
-	return net.ResolveUDPAddr("udp", ipt)
+func BuildUDPSocket(ip string, prt int) (*net.UDPAddr, error) {
+	return net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ip, prt))
 }
 
 // ============================================================
@@ -677,6 +677,18 @@ func TranslateResult(rgx *regexp.Regexp, input string, trans string, matches []i
 	var result []byte
 	result = rgx.ExpandString(result, trans, input, matches)
 	return string(result)
+}
+
+func TranslateResult2(input string, rgx *regexp.Regexp, trans string) (string, bool) {
+	var (
+		result    []byte
+		resultStr string
+	)
+
+	result = rgx.ExpandString(result, trans, input, rgx.FindStringSubmatchIndex(input))
+	resultStr = string(result)
+
+	return resultStr, (resultStr != "" && trans != "") || (resultStr == "" && trans == "")
 }
 
 //===================================================================

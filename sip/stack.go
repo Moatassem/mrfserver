@@ -213,7 +213,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 	//body parsing
 	if cntntLength == 0 {
 		payload = payload[_bodyStartIdx:]
-		sipmsg.Body = new(MessageBody)
+		sipmsg.Body = NewMessageBody(false)
 		return sipmsg, payload, nil
 	}
 	// #nosec G115: Ignoring integer overflow conversion gosec error - payload is always under limit of uint16
@@ -222,7 +222,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 		return nil, nil, errors.New("bad content-length or fragmented pdu")
 	}
 	// ---------------------------------
-	var MB = MessageBody{PartsContents: make(map[BodyType]ContentPart)}
+	var MB = NewMessageBody(true)
 
 	var cntntTypeSections map[string]string
 	ok, v := msgmap.ValuesHeader(Content_Type)
@@ -292,7 +292,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 		}
 	}
 
-	sipmsg.Body = &MB
+	sipmsg.Body = MB
 
 	return sipmsg, payload, nil
 }

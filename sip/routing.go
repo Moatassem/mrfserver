@@ -22,6 +22,7 @@ import (
 	"SRGo/sip/status"
 	"fmt"
 	"net"
+	"slices"
 )
 
 func getURIUsername(uri string) string {
@@ -101,8 +102,130 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 		ss.RejectMe(trans, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP")
 		return
 	}
-	fmt.Println(sess)
-	ss.SendResponse(trans, status.OK, EmptyBody())
+	var media *sdp.Media
+	var conn *sdp.Connection = sess.Connection
+	var audioFormat *sdp.Format
+	var dtmfFormat *sdp.Format
+	for i := 0; i < len(sess.Media); i++ {
+		media = sess.Media[i]
+		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
+			continue
+		}
+		for j := 0; j < len(media.Connection); j++ {
+			connection := media.Connection[j]
+			if connection.Address == "0.0.0.0" || connection.Type != sdp.TypeIPv4 || connection.Network != sdp.NetworkInternet {
+				continue
+			}
+			conn = connection
+			break
+		}
+		for k := 0; k < len(media.Format); k++ {
+			frmt := media.Format[k]
+			if frmt.Channels != 1 || frmt.ClockRate != 8000 || !slices.Contains(sdp.SupportedCodecs, frmt.Payload) {
+				continue
+			}
+			audioFormat = frmt
+			break
+		}
+		for k := 0; k < len(media.Format); k++ {
+			frmt := media.Format[k]
+			if frmt.Name == sdp.TelephoneEvents {
+				dtmfFormat = frmt
+				break
+			}
+		}
+		break
+	}
+	if conn == nil {
+		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No available media connection found")
+		return
+	}
+	if media == nil {
+		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No available SDP found")
+		return
+	}
+	if audioFormat == nil {
+		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No common audio codec found")
+		return
+	}
+	if dtmfFormat == nil {
+
+	}
+	rmedia, err := BuildUDPSocket(conn.Address, media.Port)
+	if err != nil {
+		ss.RejectMe(trans, status.ServiceUnavailable, q850.CallRejected, "Unable to parse received connection IPv4")
+		return
+	}
+
+	ss.RemoteMedia = rmedia
+	fmt.Println(audioFormat)
+	fmt.Println(dtmfFormat)
+
+	mySDP := &sdp.Session{
+		Origin: &sdp.Origin{
+			Username:       "mt",
+			SessionID:      int64(RandomNum(1000, 9000)),
+			SessionVersion: 1,
+			Network:        sdp.NetworkInternet,
+			Type:           sdp.TypeIPv4,
+			Address:        ServerIPv4,
+		},
+		Name: "MRF",
+		// Information: "A Seminar on the session description protocol",
+		// URI:         "http://www.example.com/seminars/sdp.pdf",
+		// Email:       []string{"j.doe@example.com (Jane Doe)"},
+		// Phone:       []string{"+1 617 555-6011"},
+		Connection: &sdp.Connection{
+			Network: sdp.NetworkInternet,
+			Type:    sdp.TypeIPv4,
+			Address: ServerIPv4,
+			TTL:     0,
+		},
+		// Bandwidth: []*Bandwidth{
+		// 	{"AS", 2000},
+		// },
+		// Timing: &Timing{
+		// 	Start: parseTime("1996-02-27 15:26:59 +0000 UTC"),
+		// 	Stop:  parseTime("1996-05-30 16:26:59 +0000 UTC"),
+		// },
+		// Repeat: []*Repeat{
+		// 	{
+		// 		Interval: time.Duration(604800) * time.Second,
+		// 		Duration: time.Duration(3600) * time.Second,
+		// 		Offsets: []time.Duration{
+		// 			time.Duration(0),
+		// 			time.Duration(90000) * time.Second,
+		// 		},
+		// 	},
+		// },
+		// TimeZone: []*TimeZone{
+		// 	{Time: parseTime("1996-02-27 15:26:59 +0000 UTC"), Offset: -time.Hour},
+		// 	{Time: parseTime("1996-05-30 16:26:59 +0000 UTC"), Offset: 0},
+		// },
+		Mode: sdp.SendRecv,
+	}
+
+	for i := 0; i < len(sess.Media); i++ {
+		media = sess.Media[i]
+		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
+			mySDP.Media = append(mySDP.Media, &sdp.Media{
+				Type:  media.Type,
+				Port:  0,
+				Proto: media.Proto})
+			continue
+		}
+		mySDP.Media = append(mySDP.Media, &sdp.Media{
+			Type:   "audio",
+			Port:   5000, //<<<<<<<<<<<<<<<<<<<<<<<
+			Proto:  "RTP/AVP",
+			Format: []*sdp.Format{audioFormat, dtmfFormat}})
+	}
+	mySDPBytes := mySDP.Bytes()
+
+	ss.LocalBody = NewMessageBody(true)
+	ss.LocalBody.PartsContents[SDP] = ContentPart{Bytes: mySDPBytes}
+
+	ss.SendResponse(trans, status.OK, *ss.LocalBody)
 }
 
 // ==

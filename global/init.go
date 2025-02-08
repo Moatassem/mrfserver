@@ -20,13 +20,14 @@ import (
 
 func InitializeEngine() {
 	responsesHeadersInit()
-	BufferPool = newSyncPool()
+	BufferPool = newSyncPool(BufferSize)
+	MediaBufferPool = newSyncPool(MediaBufferSize)
 }
 
-func newSyncPool() *sync.Pool {
+func newSyncPool(bsz int) *sync.Pool {
 	return &sync.Pool{
 		New: func() any {
-			b := make([]byte, BufferSize)
+			b := make([]byte, bsz)
 			return &b
 		},
 	}

@@ -26,6 +26,7 @@ const (
 	B2BUAName  = "SRGo/1.2"
 
 	BufferSize           int    = 4096
+	MediaBufferSize      int    = 200
 	T1Timer              int    = 500
 	ReTXCount            int    = 5
 	MultipartBoundary    string = "unique-boundary-1"
@@ -39,16 +40,18 @@ const (
 )
 
 var (
+	ServerIPv4  string
 	SipUdpPort  int //TODO add a list of listening UDP ports if needed later, for now, it is a single port
 	HttpTcpPort int
 	RateLimit   int = -1 //TODO 2000 || 0 = switched off, -1 = unlimited, > 0 = limited
 
 	MediaPath string
 
-	BufferPool  *sync.Pool
-	Prometrics  *prometheus.Metrics
-	CallLimiter *cl.CallLimiter
-	WtGrp       sync.WaitGroup
+	BufferPool      *sync.Pool
+	MediaBufferPool *sync.Pool
+	Prometrics      *prometheus.Metrics
+	CallLimiter     *cl.CallLimiter
+	WtGrp           sync.WaitGroup
 )
 
 var (

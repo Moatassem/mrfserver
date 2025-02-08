@@ -66,11 +66,14 @@ type SipSession struct {
 	UDPListenser     *net.UDPConn
 	RemoteUserAgent  *SipUdpUserAgent
 
+	RemoteMedia *net.UDPAddr
+	LocalBody   *MessageBody
+
 	FwdCSeq uint32
 	BwdCSeq uint32
 	RSeq    uint32
 
-	RemoteBody        MessageBody //to save body if SDP is included
+	RemoteBody        MessageBody //to save incoming body if SDP is included
 	SDPHashValue      string
 	SDPSessionID      uint64
 	SDPSessionVersion uint64
