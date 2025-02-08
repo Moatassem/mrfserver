@@ -101,6 +101,7 @@ type Repeat struct {
 
 // Media contains media description.
 type Media struct {
+	Chosen      bool
 	Type        string
 	Port        int
 	PortNum     int

@@ -84,6 +84,7 @@ func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
 		os.Exit(2)
 	}
 	ServerIPv4 = serverIP.String()
+	MediaPorts = NewMediaPortPool()
 
 	startWorkers(serverUDPListener)
 	udpLoopWorkers(serverUDPListener)

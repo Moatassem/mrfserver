@@ -364,7 +364,7 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 		for i, ln := range lines {
 			var mtch []string
 			if RMatch(ln, SDPOriginLine, &mtch) {
-				lines[i] = fmt.Sprintf("o=- %v %v IN IP4 %v", ss.SDPSessionID, ss.SDPSessionVersion, mtch[3])
+				lines[i] = fmt.Sprintf("o=%s %v %v IN IP4 %v", mtch[1], ss.SDPSessionID, ss.SDPSessionVersion, mtch[4])
 				break
 			}
 		}

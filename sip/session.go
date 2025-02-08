@@ -67,6 +67,7 @@ type SipSession struct {
 	RemoteUserAgent  *SipUdpUserAgent
 
 	RemoteMedia *net.UDPAddr
+	LocalSocket *MediaSocket
 	LocalBody   *MessageBody
 
 	FwdCSeq uint32
@@ -1400,6 +1401,7 @@ func (session *SipSession) DropMe() {
 	}
 	fmt.Println("Session:", session.CallID, "State:", session.state.String())
 	session.IsDisposed = true
+	MediaPorts.ReleaseSocket(session.LocalSocket)
 	close(session.maxDprobDoneChan)
 	Sessions.Delete(session.CallID)
 }

@@ -25,15 +25,19 @@ const (
 	EntityName = "OINIS-NSF"
 	B2BUAName  = "SRGo/1.2"
 
-	BufferSize           int    = 4096
-	MediaBufferSize      int    = 200
+	BufferSize int = 4096
+
+	MediaBufferSize int = 200
+	MediaStartPort  int = 6000
+	MediaEndPort    int = 20000
+
 	T1Timer              int    = 500
 	ReTXCount            int    = 5
 	MultipartBoundary    string = "unique-boundary-1"
 	SipVersion           string = "SIP/2.0"
 	DeltaRune            rune   = 'a' - 'A'
 	MagicCookie          string = "z9hG4bK"
-	AllowedMethods       string = "INVITE, PRACK, ACK, CANCEL, BYE, OPTIONS, UPDATE, INFO, REGISTER, REFER, SUBSCRIBE, NOTIFY, PUBLISH, MESSAGE"
+	AllowedMethods       string = "INVITE, PRACK, ACK, CANCEL, BYE, OPTIONS, UPDATE, INFO, NOTIFY, MESSAGE"
 	SessionDropDelaySec  int    = 4   //seconds
 	InDialogueProbingSec int    = 300 //seconds
 	MinMaxFwds           int    = 2
@@ -133,7 +137,7 @@ var (
 		ViaTransport:               regexp.MustCompile(`(?i)SIP/2.0/(\w+)`),
 		MediaPayloadTypes:          regexp.MustCompile(`(?i)^m=\w+\s+(\d+)\s+([^\s]+)\s+([\w\s]+)`),
 		MediaPayloadTypeDefinition: regexp.MustCompile(`(?i)a=(?:rtpmap|fmtp)\s*:\s*(\d+)\s+`),
-		SDPOriginLine:              regexp.MustCompile(`(?i)^o=[^\s]+\s+(\d+)\s+(\d+)\s+IN\s+IP4\s+((?:\d{1,3}\.){3}\d{1,3})`),
+		SDPOriginLine:              regexp.MustCompile(`(?i)^o=([^\s]+)\s+(\d+)\s+(\d+)\s+IN\s+IP4\s+((?:\d{1,3}\.){3}\d{1,3})`),
 		MediaDirective:             regexp.MustCompile(`(?i)^a=(sendrecv|sendonly|recvonly|inactive)\s*$`),
 		ConnectionAddress:          regexp.MustCompile(`(?i)^c=IN\s+IP4\s+((?:\d{1,3}\.){3}\d{1,3})`),
 		FullHeader:                 regexp.MustCompile(`(?i)^\s*([^:]+)\s*:\s*(.+)$`),

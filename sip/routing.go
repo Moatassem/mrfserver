@@ -108,7 +108,7 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 	var dtmfFormat *sdp.Format
 	for i := 0; i < len(sess.Media); i++ {
 		media = sess.Media[i]
-		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
+		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || conn == nil && len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
 			continue
 		}
 		for j := 0; j < len(media.Connection); j++ {
@@ -134,6 +134,7 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 				break
 			}
 		}
+		media.Chosen = true
 		break
 	}
 	if conn == nil {
@@ -148,9 +149,9 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No common audio codec found")
 		return
 	}
-	if dtmfFormat == nil {
+	// if dtmfFormat == nil {
+	// }
 
-	}
 	rmedia, err := BuildUDPSocket(conn.Address, media.Port)
 	if err != nil {
 		ss.RejectMe(trans, status.ServiceUnavailable, q850.CallRejected, "Unable to parse received connection IPv4")
@@ -158,8 +159,21 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 	}
 
 	ss.RemoteMedia = rmedia
-	fmt.Println(audioFormat)
-	fmt.Println(dtmfFormat)
+
+	// reserve a local UDP port
+	// TODO need to ask OS if this port is really available!!!
+	// TODO need to handle incoming ReINVITE
+	// TODO need to negotiate media-directive properly
+	// need to handle CANCEL and UPDPATE
+	// need to handle INFO to play the required audio files
+	// need to handle DTMF
+	// TODO need to build RTP packets and stream media back
+	ss.LocalSocket = MediaPorts.ReserveSocket(ServerIPv4)
+
+	if ss.LocalSocket == nil {
+		ss.RejectMe(trans, status.ServiceUnavailable, q850.CallRejected, "Media pool depleted")
+		return
+	}
 
 	mySDP := &sdp.Session{
 		Origin: &sdp.Origin{
@@ -202,23 +216,26 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 		// 	{Time: parseTime("1996-02-27 15:26:59 +0000 UTC"), Offset: -time.Hour},
 		// 	{Time: parseTime("1996-05-30 16:26:59 +0000 UTC"), Offset: 0},
 		// },
-		Mode: sdp.SendRecv,
 	}
 
 	for i := 0; i < len(sess.Media); i++ {
-		media = sess.Media[i]
-		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
-			mySDP.Media = append(mySDP.Media, &sdp.Media{
-				Type:  media.Type,
-				Port:  0,
-				Proto: media.Proto})
-			continue
+		media := sess.Media[i]
+		var newmedia *sdp.Media
+		if media.Chosen {
+			newmedia = &sdp.Media{
+				Type:       "audio",
+				Port:       ss.LocalSocket.Port,
+				Proto:      "RTP/AVP",
+				Format:     []*sdp.Format{audioFormat},
+				Attributes: []*sdp.Attr{{Name: "ptime", Value: "20"}},
+				Mode:       sdp.SendRecv}
+			if dtmfFormat != nil {
+				newmedia.Format = append(newmedia.Format, dtmfFormat)
+			}
+		} else {
+			newmedia = &sdp.Media{Type: media.Type, Port: 0, Proto: media.Proto}
 		}
-		mySDP.Media = append(mySDP.Media, &sdp.Media{
-			Type:   "audio",
-			Port:   5000, //<<<<<<<<<<<<<<<<<<<<<<<
-			Proto:  "RTP/AVP",
-			Format: []*sdp.Format{audioFormat, dtmfFormat}})
+		mySDP.Media = append(mySDP.Media, newmedia)
 	}
 	mySDPBytes := mySDP.Bytes()
 
