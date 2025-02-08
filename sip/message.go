@@ -68,7 +68,7 @@ func NewResponseMessage(sc int, rp string) *SipMessage {
 	sipmsg := &SipMessage{MsgType: RESPONSE, StartLine: new(SipStartLine)}
 	if 100 <= sc && sc <= 699 {
 		sipmsg.StartLine.StatusCode = sc
-		dfltsc := Str2int[int](fmt.Sprintf("%d00", sc/100))
+		dfltsc := Str2Int[int](fmt.Sprintf("%d00", sc/100))
 		sipmsg.StartLine.ReasonPhrase = cmp.Or(rp, DicResponse[sc], DicResponse[dfltsc])
 	}
 	return sipmsg
@@ -178,8 +178,8 @@ func (sipmsg *SipMessage) GetRSeqFromRAck() (rSeq, cSeq uint32, ok bool) {
 		ok = false
 		return
 	}
-	rSeq = Str2uint[uint32](mtch[1])
-	cSeq = Str2uint[uint32](mtch[2])
+	rSeq = Str2Uint[uint32](mtch[1])
+	cSeq = Str2Uint[uint32](mtch[2])
 	ok = true
 	return
 }
@@ -282,17 +282,17 @@ func (sipmsg *SipMessage) GetRegistrationData() (contact, ext, ruri, ipport stri
 		return
 	}
 	if RMatch(contact, ExpiresParameter, &mtch) {
-		expiresInt = Str2int[int](mtch[1])
+		expiresInt = Str2Int[int](mtch[1])
 		return
 	}
 	expires := sipmsg.Headers.ValueHeader(Expires)
 	if expires != "" {
-		expiresInt = Str2int[int](expires)
+		expiresInt = Str2Int[int](expires)
 		return
 	}
 	expires = "3600"
 	sipmsg.Headers.SetHeader(Expires, expires)
-	expiresInt = Str2int[int](expires)
+	expiresInt = Str2Int[int](expires)
 	return
 }
 

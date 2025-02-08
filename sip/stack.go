@@ -79,7 +79,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 	} else {
 		if RMatch(msglines[lnIdx], ResponseStartLinePattern, &matches) {
 			msgType = RESPONSE
-			code := Str2int[int](matches[2])
+			code := Str2Int[int](matches[2])
 			if code < 100 || code > 699 {
 				return nil, nil, errors.New("invalid code for Response message")
 			}
@@ -151,7 +151,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 					LogError(LTSIPStack, "Invalid CSeq header")
 					return nil, nil, errors.New("invalid CSeq header")
 				}
-				sipmsg.CSeqNum = Str2uint[uint32](cseq[1])
+				sipmsg.CSeqNum = Str2Uint[uint32](cseq[1])
 				sipmsg.CSeqMethod = MethodFromName(cseq[2])
 				if startLine.StatusCode == 0 {
 					r1 := startLine.Method.String()
@@ -200,7 +200,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 	sipmsg.ContentLength = cntntLength
 
 	if ok, values := msgmap.ValuesHeader(Content_Length); ok {
-		cntntLength = Str2uint[uint16](values[0])
+		cntntLength = Str2Uint[uint16](values[0])
 	} else {
 		if ok, _ := msgmap.ValuesHeader(Content_Type); ok {
 			msgmap.AddHeader(Content_Length, fmt.Sprintf("%d", cntntLength))

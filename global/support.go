@@ -284,7 +284,77 @@ func GetBodyType(contentType string) BodyType {
 	return Unknown
 }
 
-func Str2int[T int | int8 | int16 | int32 | int64](s string) T {
+// Convert string to int with default value with not included minimum and maximum
+func Str2IntDefaultMinMax[T int | int8 | int16 | int32 | int64](s string, d, min, max T) (T, bool) {
+	var out T
+	if len(s) == 0 {
+		return d, false
+	}
+	idx := 0
+	isN := s[idx] == '-'
+	if isN {
+		idx++
+	}
+	for i := idx; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return d, false
+		}
+		out = out*10 + T(s[i]-'0')
+	}
+	if isN {
+		out = -out
+	}
+	if out <= min || out >= max {
+		return d, false
+	}
+	return out, true
+}
+
+func Str2IntDefaultMinimum[T int | int8 | int16 | int32 | int64](s string, d T, min T) (T, bool) {
+	var out T
+	if len(s) == 0 {
+		return d, false
+	}
+	idx := 0
+	isN := s[idx] == '-'
+	if isN {
+		idx++
+	}
+	for i := idx; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return d, false
+		}
+		out = out*10 + T(s[i]-'0')
+	}
+	if isN {
+		out = -out
+	}
+	if out <= min {
+		return d, false
+	}
+	return out, true
+}
+
+func Str2IntDefault[T int | int8 | int16 | int32 | int64](s string, d T) (T, bool) {
+	var out T
+	if len(s) == 0 {
+		return d, false
+	}
+	idx := 0
+	isN := s[idx] == '-'
+	if isN {
+		idx++
+	}
+	for i := idx; i < len(s); i++ {
+		out = out*10 + T(s[i]-'0')
+	}
+	if isN {
+		return -out, true
+	}
+	return out, true
+}
+
+func Str2Int[T int | int8 | int16 | int32 | int64](s string) T {
 	var out T
 	if len(s) == 0 {
 		return out
@@ -303,7 +373,7 @@ func Str2int[T int | int8 | int16 | int32 | int64](s string) T {
 	return out
 }
 
-func Str2uint[T uint | uint8 | uint16 | uint32 | uint64](s string) T {
+func Str2Uint[T uint | uint8 | uint16 | uint32 | uint64](s string) T {
 	var out T
 	if len(s) == 0 {
 		return out
@@ -530,7 +600,7 @@ func TranslateInternal(input string, matches []string) (string, error) {
 		return "", fmt.Errorf("empty matches slice")
 	}
 	sbToInt := func(sb strings.Builder) int {
-		return Str2int[int](sb.String())
+		return Str2Int[int](sb.String())
 	}
 
 	item := func(idx int, dblbrkt bool) string {

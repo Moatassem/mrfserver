@@ -55,23 +55,18 @@ func checkArgs() (ipv4 string, sipuport, httpport int) {
 		os.Exit(1)
 	}
 
-	sup, ok := os.LookupEnv(Own_SIP_UdpPort)
-	if ok {
-		sipuport = global.Str2int[int](sup)
-	} else {
-		sipuport = 5060
-	}
+	sup := os.Getenv(Own_SIP_UdpPort)
+	sipuport, _ = global.Str2IntDefaultMinMax(sup, 5060, 4999, 6000)
 
-	hp, ok := os.LookupEnv(Own_Http_Port)
-	if ok {
-		httpport = global.Str2int[int](hp)
-	} else {
-		httpport = 8080
-	}
+	hp := os.Getenv(Own_Http_Port)
+	httpport, _ = global.Str2IntDefaultMinMax(hp, 8080, 79, 9999)
 
 	mp, ok := os.LookupEnv(Media_Path)
 	if ok {
 		global.MediaPath = mp
+	} else {
+		fmt.Println("No media directory provided!")
+		os.Exit(2)
 	}
 
 	return

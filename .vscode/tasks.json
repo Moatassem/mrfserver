@@ -7,10 +7,10 @@
       "command": "go run .",
       "options": {
         "env": {
-          // "as_sip_udp": "192.168.1.2:5060",
           "server_ipv4": "192.168.1.2",
           "sip_udp_port": "5060",
-          "http_port": "8080"
+          "http_port": "8080",
+          "media_path": "D:\\Downloads\\Varieties\\Songs"
         }
       },
       "problemMatcher": []

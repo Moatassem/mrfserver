@@ -267,7 +267,7 @@ func (session *SipSession) AddIncomingResponse(responseMsg *SipMessage) *Transac
 
 func (session *SipSession) GenerateOutgoingPRACKST(responseMsg *SipMessage) *Transaction {
 	// Parse RSeq from the headers and handle the error
-	rSeq := Str2uint[uint32](responseMsg.Headers.ValueHeader(RSeq))
+	rSeq := Str2Uint[uint32](responseMsg.Headers.ValueHeader(RSeq))
 	cseqHeaderValue := responseMsg.Headers.ValueHeader(CSeq)
 	newST := NewSIPTransaction_RC(rSeq, cseqHeaderValue)
 
@@ -996,7 +996,7 @@ func (session *SipSession) UpdateContactRecordRouteBody(sipmsg *SipMessage) {
 		if !RMatch(hv, FQDNPort, &mtch) {
 			return false, hv, nil
 		}
-		prt := Str2int[int](mtch[2])
+		prt := Str2Int[int](mtch[2])
 		prt = cmp.Or(prt, 5060)
 		ip := net.ParseIP(mtch[1])
 		if ip == nil {

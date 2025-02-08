@@ -54,7 +54,6 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 	}
 
 	ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
-
 }
 
 func (ss1 *SipSession) RerouteRequest(rspnspk ResponsePack) {

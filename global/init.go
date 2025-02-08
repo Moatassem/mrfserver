@@ -21,7 +21,6 @@ import (
 func InitializeEngine() {
 	responsesHeadersInit()
 	BufferPool = newSyncPool()
-
 }
 
 func newSyncPool() *sync.Pool {
