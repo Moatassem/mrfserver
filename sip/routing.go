@@ -17,13 +17,11 @@ package sip
 import (
 	. "SRGo/global"
 	"SRGo/q850"
-	"SRGo/sip/ivr"
+	"SRGo/sdp"
 	"SRGo/sip/state"
 	"SRGo/sip/status"
 	"fmt"
 	"net"
-
-	"github.com/pixelbender/go-sdp/sdp"
 )
 
 func getURIUsername(uri string) string {
@@ -44,16 +42,15 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 	upart := sipmsg1.StartLine.UserPart
 
 	if !sipmsg1.Body.ContainsSDP() {
-		ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP or delay offer")
+		ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP or delayed offer")
 		return
 	}
 
-	if ivr, ok := ivr.IVRsRepo.Get(upart); ok {
-		ss1.AnswerIVR(trans1, sipmsg1, ivr)
-		return
-	}
+	// if ivr, ok := ivr.IVRsRepo.Get(upart); ok {
 
-	ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
+	ss1.AnswerIVR(trans1, sipmsg1, upart)
+
+	// ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
 }
 
 func (ss1 *SipSession) RerouteRequest(rspnspk ResponsePack) {
@@ -97,7 +94,7 @@ func (ss1 *SipSession) RerouteRequest(rspnspk ResponsePack) {
 
 // ============================================================================
 // IVR transfer functions
-func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, bytes *[]byte) {
+func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart string) {
 	sdpbytes, _ := sipmsg.GetBodyPart(SDP)
 	sess, err := sdp.ParseString(string(sdpbytes))
 	if err != nil {

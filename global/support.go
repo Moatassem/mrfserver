@@ -284,72 +284,41 @@ func GetBodyType(contentType string) BodyType {
 	return Unknown
 }
 
-// Convert string to int with default value with not included minimum and maximum
+// Convert string to int with default value with included minimum or maximum
 func Str2IntDefaultMinMax[T int | int8 | int16 | int32 | int64](s string, d, min, max T) (T, bool) {
+	out, ok := Str2IntCheck[T](s)
+	if ok {
+		if out < min || out > max {
+			return d, false
+		}
+		return out, true
+	}
+	return d, false
+}
+
+func Str2IntCheck[T int | int8 | int16 | int32 | int64](s string) (T, bool) {
 	var out T
 	if len(s) == 0 {
-		return d, false
+		return out, false
 	}
 	idx := 0
 	isN := s[idx] == '-'
 	if isN {
 		idx++
+		if len(s) == 1 {
+			return out, false
+		}
+	} else if s[idx] == '+' {
+		idx++
 	}
 	for i := idx; i < len(s); i++ {
 		if s[i] < '0' || s[i] > '9' {
-			return d, false
+			return out, false
 		}
 		out = out*10 + T(s[i]-'0')
 	}
 	if isN {
 		out = -out
-	}
-	if out <= min || out >= max {
-		return d, false
-	}
-	return out, true
-}
-
-func Str2IntDefaultMinimum[T int | int8 | int16 | int32 | int64](s string, d T, min T) (T, bool) {
-	var out T
-	if len(s) == 0 {
-		return d, false
-	}
-	idx := 0
-	isN := s[idx] == '-'
-	if isN {
-		idx++
-	}
-	for i := idx; i < len(s); i++ {
-		if s[i] < '0' || s[i] > '9' {
-			return d, false
-		}
-		out = out*10 + T(s[i]-'0')
-	}
-	if isN {
-		out = -out
-	}
-	if out <= min {
-		return d, false
-	}
-	return out, true
-}
-
-func Str2IntDefault[T int | int8 | int16 | int32 | int64](s string, d T) (T, bool) {
-	var out T
-	if len(s) == 0 {
-		return d, false
-	}
-	idx := 0
-	isN := s[idx] == '-'
-	if isN {
-		idx++
-	}
-	for i := idx; i < len(s); i++ {
-		out = out*10 + T(s[i]-'0')
-	}
-	if isN {
-		return -out, true
 	}
 	return out, true
 }
@@ -365,6 +334,9 @@ func Str2Int[T int | int8 | int16 | int32 | int64](s string) T {
 		idx++
 	}
 	for i := idx; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return out
+		}
 		out = out*10 + T(s[i]-'0')
 	}
 	if isN {
@@ -379,6 +351,9 @@ func Str2Uint[T uint | uint8 | uint16 | uint32 | uint64](s string) T {
 		return out
 	}
 	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return out
+		}
 		out = out*10 + T(s[i]-'0')
 	}
 	return out
