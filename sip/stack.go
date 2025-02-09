@@ -434,13 +434,18 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			ss.RouteRequestInternal(trans, sipmsg)
 		case ReINVITE:
 			ss.SendResponse(trans, 100, EmptyBody())
-			lnkdss := ss.LinkedSession
-			if !ss.ChecknSetDialogueChanging(true) || (lnkdss != nil && lnkdss.IsDialogueChanging()) {
+			if !ss.ChecknSetDialogueChanging(true) {
 				ss.SendResponseDetailed(trans, NewResponsePackRFWarning(status.RequestPending, "", "Competing ReINVITE rejected"), EmptyBody())
 				return
 			}
-			if lnkdss != nil {
-				lnkdss.SendRequest(ReINVITE, trans, *sipmsg.Body)
+			if sipmsg.Body.ContainsSDP() {
+				sc, qc, wr := ss.BuildSDPAnswer(sipmsg)
+				if sc != 0 {
+					ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(sc, qc, wr), EmptyBody())
+				}
+				ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
+			} else {
+				// TODO if ReINVITE is delayed offer
 			}
 		case ACK:
 			if trans.Method == INVITE {
@@ -456,12 +461,9 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 					lnkdss.SendRequest(ACK, nil, *sipmsg.Body)
 				}
 			} else { //ReINVITE
-				if lnkdss := ss.LinkedSession; lnkdss != nil {
-					if trans.LinkedTransaction.IsFinalResponsePositiveSYNC() {
-						ss.ChecknSetDialogueChanging(false)
-						lnkdss.ChecknSetDialogueChanging(false)
-					}
-					lnkdss.SendRequest(ACK, trans.LinkedTransaction, *sipmsg.Body)
+				if trans.IsFinalResponsePositiveSYNC() {
+					ss.ChecknSetDialogueChanging(false)
+					// TODO update connection to the new remote UDO if any and update codec streaming
 				}
 			}
 		case CANCEL:

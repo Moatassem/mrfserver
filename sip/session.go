@@ -18,6 +18,7 @@ import (
 	. "SRGo/global"
 	"SRGo/guid"
 	"SRGo/q850"
+	"SRGo/sdp"
 	"SRGo/sip/mode"
 	"SRGo/sip/state"
 	"SRGo/sip/status"
@@ -51,7 +52,7 @@ type SipSession struct {
 
 	RoutingData *RoutingData
 
-	dscmutex         sync.RWMutex
+	dcmutex          sync.RWMutex
 	dialogueChanging bool
 
 	IsPRACKSupported   bool
@@ -66,9 +67,10 @@ type SipSession struct {
 	UDPListenser     *net.UDPConn
 	RemoteUserAgent  *SipUdpUserAgent
 
-	RemoteMedia *net.UDPAddr
-	LocalSocket *MediaSocket
-	LocalBody   *MessageBody
+	RemoteMedia    *net.UDPAddr
+	LocalSocket    *MediaSocket
+	LocalSDP       *sdp.Session
+	WithTeleEvents bool
 
 	FwdCSeq uint32
 	BwdCSeq uint32
@@ -1108,14 +1110,14 @@ func CheckPendingTransaction(ss *SipSession, tx *Transaction) {
 // for indialogue change
 
 func (ss *SipSession) IsDialogueChanging() bool {
-	ss.dscmutex.RLock()
-	defer ss.dscmutex.RUnlock()
+	ss.dcmutex.RLock()
+	defer ss.dcmutex.RUnlock()
 	return ss.dialogueChanging
 }
 
 func (ss *SipSession) ChecknSetDialogueChanging(newflag bool) bool {
-	ss.dscmutex.Lock()
-	defer ss.dscmutex.Unlock()
+	ss.dcmutex.Lock()
+	defer ss.dcmutex.Unlock()
 	if newflag != ss.dialogueChanging {
 		ss.dialogueChanging = newflag
 		return true
@@ -1352,13 +1354,13 @@ func (session *SipSession) CancelMe(q850 int, details string) bool {
 }
 
 // Reject incoming INVITE
-func (session *SipSession) RejectMe(trans *Transaction, stsCode int, q850 int, details string) bool {
+func (session *SipSession) RejectMe(trans *Transaction, sipCode int, q850Cause int, details string) bool {
 	if session.Direction != INBOUND {
 		return false
 	}
 	if session.IsBeingEstablished() {
 		session.SetState(state.BeingFailed)
-		session.SendResponseDetailed(trans, ResponsePack{StatusCode: stsCode, CustomHeaders: NewSHQ850OrSIP(q850, details, "")}, EmptyBody())
+		session.SendResponseDetailed(trans, ResponsePack{StatusCode: sipCode, CustomHeaders: NewSHQ850OrSIP(q850Cause, details, "")}, EmptyBody())
 		return true
 	}
 	return false

@@ -49,7 +49,7 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 
 	// if ivr, ok := ivr.IVRsRepo.Get(upart); ok {
 
-	ss1.AnswerIVR(trans1, sipmsg1, upart)
+	ss1.AnswerMRF(trans1, sipmsg1, upart)
 
 	// ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
 }
@@ -94,20 +94,22 @@ func (ss1 *SipSession) RerouteRequest(rspnspk ResponsePack) {
 }
 
 // ============================================================================
-// IVR transfer functions
-func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart string) {
+// MRF functions
+func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int, warn string) {
 	sdpbytes, _ := sipmsg.GetBodyPart(SDP)
-	sess, err := sdp.ParseString(string(sdpbytes))
+	sdpses, err := sdp.Parse(sdpbytes)
 	if err != nil {
-		ss.RejectMe(trans, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP")
+		sipcode = status.NotAcceptableHere
+		q850code = q850.BearerCapabilityNotImplemented
+		warn = "Not supported SDP"
 		return
 	}
 	var media *sdp.Media
-	var conn *sdp.Connection = sess.Connection
+	var conn *sdp.Connection = sdpses.Connection
 	var audioFormat *sdp.Format
 	var dtmfFormat *sdp.Format
-	for i := 0; i < len(sess.Media); i++ {
-		media = sess.Media[i]
+	for i := 0; i < len(sdpses.Media); i++ {
+		media = sdpses.Media[i]
 		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || conn == nil && len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
 			continue
 		}
@@ -138,23 +140,30 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 		break
 	}
 	if conn == nil {
-		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No available media connection found")
+		sipcode = status.NotAcceptableHere
+		q850code = q850.MandatoryInformationElementIsMissing
+		warn = "No available media connection found"
 		return
 	}
 	if media == nil {
-		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No available SDP found")
+		sipcode = status.NotAcceptableHere
+		q850code = q850.BearerCapabilityNotAvailable
+		warn = "No available SDP found"
 		return
 	}
 	if audioFormat == nil {
-		ss.RejectMe(trans, status.NotAcceptableHere, q850.CallRejected, "No common audio codec found")
+		sipcode = status.NotAcceptableHere
+		q850code = q850.IncompatibleDestination
+		warn = "No common audio codec found"
 		return
 	}
-	// if dtmfFormat == nil {
-	// }
+	ss.WithTeleEvents = dtmfFormat != nil
 
 	rmedia, err := BuildUDPSocket(conn.Address, media.Port)
 	if err != nil {
-		ss.RejectMe(trans, status.ServiceUnavailable, q850.CallRejected, "Unable to parse received connection IPv4")
+		sipcode = status.NotAcceptableHere
+		q850code = q850.ChannelUnacceptable
+		warn = "Unable to parse received connection IPv4"
 		return
 	}
 
@@ -162,16 +171,18 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 
 	// reserve a local UDP port
 	// TODO need to ask OS if this port is really available!!!
-	// TODO need to handle incoming ReINVITE
+	// TODO need to handle incoming ReINVITE and UPDPATE
 	// TODO need to negotiate media-directive properly
-	// need to handle CANCEL and UPDPATE
+	// need to handle CANCEL (put some delay before answering?)
 	// need to handle INFO to play the required audio files
 	// need to handle DTMF
 	// TODO need to build RTP packets and stream media back
 	ss.LocalSocket = MediaPorts.ReserveSocket(ServerIPv4)
 
 	if ss.LocalSocket == nil {
-		ss.RejectMe(trans, status.ServiceUnavailable, q850.CallRejected, "Media pool depleted")
+		sipcode = status.NotAcceptableHere
+		q850code = q850.ResourceUnavailableUnspecified
+		warn = "Media pool depleted"
 		return
 	}
 
@@ -218,17 +229,18 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 		// },
 	}
 
-	for i := 0; i < len(sess.Media); i++ {
-		media := sess.Media[i]
+	for i := 0; i < len(sdpses.Media); i++ {
+		media := sdpses.Media[i]
 		var newmedia *sdp.Media
 		if media.Chosen {
 			newmedia = &sdp.Media{
+				Chosen:     true,
 				Type:       "audio",
 				Port:       ss.LocalSocket.Port,
 				Proto:      "RTP/AVP",
 				Format:     []*sdp.Format{audioFormat},
 				Attributes: []*sdp.Attr{{Name: "ptime", Value: "20"}},
-				Mode:       sdp.SendRecv}
+				Mode:       sdp.NegotiateMode(sdp.SendRecv, sdpses.GetEffectiveMediaDirective())}
 			if dtmfFormat != nil {
 				newmedia.Format = append(newmedia.Format, dtmfFormat)
 			}
@@ -237,12 +249,16 @@ func (ss *SipSession) AnswerIVR(trans *Transaction, sipmsg *SipMessage, upart st
 		}
 		mySDP.Media = append(mySDP.Media, newmedia)
 	}
-	mySDPBytes := mySDP.Bytes()
+	ss.LocalSDP = mySDP
+	return
+}
 
-	ss.LocalBody = NewMessageBody(true)
-	ss.LocalBody.PartsContents[SDP] = ContentPart{Bytes: mySDPBytes}
-
-	ss.SendResponse(trans, status.OK, *ss.LocalBody)
+func (ss *SipSession) AnswerMRF(trans *Transaction, sipmsg *SipMessage, upart string) {
+	if sc, qc, wr := ss.BuildSDPAnswer(sipmsg); sc != 0 {
+		ss.RejectMe(trans, sc, qc, wr)
+		return
+	}
+	ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
 }
 
 // ==

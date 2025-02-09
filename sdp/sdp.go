@@ -40,6 +40,27 @@ func (s *Session) Bytes() []byte {
 	return e.Bytes()
 }
 
+// Get Chosen Media Description
+func (s *Session) GetChosenMedia() *Media {
+	for _, m := range s.Media {
+		if m.Chosen {
+			return m
+		}
+	}
+	return nil
+}
+
+func (s *Session) GetEffectiveMediaDirective() string {
+	media := s.GetChosenMedia()
+	if media.Mode != "" {
+		return media.Mode
+	}
+	if s.Mode != "" {
+		return s.Mode
+	}
+	return SendRecv
+}
+
 // Origin represents an originator of the session.
 type Origin struct {
 	Username       string

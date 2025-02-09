@@ -84,3 +84,11 @@ func NewResponsePackSRW(stc int, warning string, reason string) ResponsePack {
 		CustomHeaders: hdrs,
 	}
 }
+
+func NewResponsePackSIPQ850Details(sipc, q850c int, details string) ResponsePack {
+	hdrs := NewSHQ850OrSIP(q850c, details, "")
+	return ResponsePack{
+		StatusCode:    sipc,
+		CustomHeaders: hdrs,
+	}
+}

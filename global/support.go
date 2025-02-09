@@ -731,6 +731,8 @@ func (he HeaderEnum) Equals(h string) bool {
 
 // ====================================================
 
+// func IsEqualResponse()
+
 func IsProvisional(sc int) bool {
 	return 100 <= sc && sc <= 199
 }
