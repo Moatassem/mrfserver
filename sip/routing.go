@@ -54,45 +54,6 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 	// ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
 }
 
-func (ss1 *SipSession) RerouteRequest(rspnspk ResponsePack) {
-	defer func() {
-		if r := recover(); r != nil {
-			LogCallStack(r)
-		}
-	}()
-	if ss1 == nil {
-		return
-	}
-	// var reason string
-	// switch rspnspk.StatusCode {
-	// case 487:
-	// 	reason = "NOANSWER"
-	// case 408:
-	// 	reason = "UNREACHABLE"
-	// default:
-	// 	reason = "REJECTED"
-	// }
-	trans1 := ss1.GetLastUnACKedINVSYNC(INBOUND)
-	if trans1 == nil {
-		return
-	}
-	if ss1.IsBeingEstablished() {
-		ss1.LinkedSession = nil
-		ss1.RejectMe(trans1, rspnspk.StatusCode, q850.NormalUnspecified, "Rerouting failed")
-		return
-	}
-	// rcv18x := trans1.StatusCodeExistsSYNC(180)
-	// if err := failure(reason, rcv18x, ss1.RoutingData); err != nil {
-	// 	LogError(LTConfiguration, err.Error())
-	// 	if ss1.IsBeingEstablished() {
-	// 		ss1.LinkedSession = nil
-	// 		ss1.RejectMe(trans1, status.ServiceUnavailable, q850.ExchangeRoutingError, "Rerouting failure")
-	// 		return
-	// 	}
-	// }
-	// ss1.RouteRequest(trans1, nil)
-}
-
 // ============================================================================
 // MRF functions
 func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int, warn string) {

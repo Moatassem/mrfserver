@@ -17,11 +17,9 @@ package sip
 import (
 	. "SRGo/global"
 	"SRGo/guid"
-	"SRGo/q850"
 	"SRGo/sdp"
 	"SRGo/sip/mode"
 	"SRGo/sip/state"
-	"SRGo/sip/status"
 	"cmp"
 	"fmt"
 	"log"
@@ -49,8 +47,6 @@ type SipSession struct {
 	Force180Only bool
 
 	Mymode mode.SessionMode
-
-	RoutingData *RoutingData
 
 	dcmutex          sync.RWMutex
 	dialogueChanging bool
@@ -80,8 +76,6 @@ type SipSession struct {
 	SDPHashValue      string
 	SDPSessionID      uint64
 	SDPSessionVersion uint64
-
-	LinkedSession *SipSession
 
 	IsDisposed    bool
 	multiUseMutex sync.Mutex // used for synchronizing no18x & noAns timers, probing & max duration, dropping session
@@ -345,15 +339,6 @@ func (session *SipSession) UnPRACKed18xCountSYNC() int {
 		return x.Direction == INBOUND && x.Method == PRACK && x.RequestMessage == nil
 	})
 	return len(lst)
-}
-
-func (session *SipSession) CreateLinkedINVITE(userpart string, body MessageBody) (*Transaction, *SipMessage) {
-	trans := session.AddOutgoingRequest(INVITE, nil)
-	sipmsg := NewRequestMessage(INVITE, userpart)
-	sipmsg.Headers = NewSHsPointer(true)
-	session.ProxifyRequestHeaders(sipmsg, trans)
-	session.ProcessRequestHeaders(trans, sipmsg, RequestPack{Method: INVITE}, body)
-	return trans, sipmsg
 }
 
 func (session *SipSession) SendRequest(m Method, trans *Transaction, body MessageBody) {
@@ -718,105 +703,6 @@ func (session *SipSession) GetLastUnACKedINVSYNC(dir Direction) *Transaction {
 	return session.GetLastUnACKedINV(dir)
 }
 
-func (session *SipSession) ProxifyRequestHeaders(sipmsg *SipMessage, trans *Transaction) {
-	lnkdsipmsg := session.LinkedSession.CurrentRequestMessage()
-	sipHdrs := sipmsg.Headers
-
-	localsocket := GenerateUDPSocket(session.UDPListenser)
-	localIP := localsocket.IP
-	remoteIP := session.RemoteUDP.IP
-
-	sl := sipmsg.StartLine
-	sl.HostPart = session.RemoteUDP.String()
-	sl.UserParameters = &map[string]string{}
-	sl.UriParameters = &map[string]string{"user": "phone"}
-	sl.Ruri = fmt.Sprintf("%v:%v%v@%v%v", sl.UriScheme, sl.UserPart, GenerateParameters(sl.UserParameters), sl.HostPart, GenerateParameters(sl.UriParameters))
-
-	var nm, nmbr string
-	var mtch []string
-
-	// From Header
-	var frmHeader string
-	if lnkdsipmsg.Headers.DoesValueExistInHeader("Privacy", "user") {
-		frmHeader = `"Anonymous" <sip:anonymous@anonymous.invalid>`
-	} else {
-		if RMatch(lnkdsipmsg.Headers.ValueHeader(From), NameAndNumber, &mtch) {
-			nm = DropVisualSeparators(TrimWithSuffix(mtch[1], " "))
-			nmbr = DropVisualSeparators(mtch[2])
-			frmHeader = fmt.Sprintf("%s<sip:%s@%s;user=phone>", nm, nmbr, localIP)
-		} else {
-			frmHeader = fmt.Sprintf("<sip:Invalid@%s;user=phone>", localIP)
-		}
-	}
-
-	session.FromTag = guid.NewTag()
-	trans.From = fmt.Sprintf("%s;tag=%s", frmHeader, session.FromTag)
-	sipHdrs.SetHeader(From, trans.From)
-	session.FromHeader = trans.From
-
-	// To Header
-	if RMatch(lnkdsipmsg.Headers.ValueHeader(To), NameAndNumber, &mtch) {
-		nm = DropVisualSeparators(TrimWithSuffix(mtch[1], " "))
-		nmbr = DropVisualSeparators(mtch[2])
-		trans.To = fmt.Sprintf("%s<sip:%s@%s;user=phone>", nm, nmbr, remoteIP)
-	}
-	sipHdrs.SetHeader(To, trans.To)
-	session.ToHeader = trans.To
-
-	// Call-ID Header
-	session.CallID = guid.NewCallID()
-	sipHdrs.SetHeader(Call_ID, session.CallID)
-
-	// Via Header
-	sipHdrs.AddHeader(Via, fmt.Sprintf("%s;branch=%s", GenerateViaWithoutBranch(session.UDPListenser), trans.ViaBranch))
-
-	// Contact Header
-	sipHdrs.SetHeader(Contact, GenerateContact(localsocket))
-
-	// Content-Disposition
-	sipHdrs.AddHeader(Content_Disposition, lnkdsipmsg.Headers.ValueHeader(Content_Disposition))
-
-	// Forward Diversion header as per RFC 5806
-	sipHdrs.AddHeader(Diversion, lnkdsipmsg.Headers.ValueHeader(Diversion))
-
-	// Privacy Header
-	sipHdrs.AddHeader(Privacy, lnkdsipmsg.Headers.ValueHeader(Privacy))
-
-	// History-Info Header
-	sipHdrs.AddHeader(History_Info, lnkdsipmsg.Headers.ValueHeader(History_Info))
-
-	// P-Headers
-	pHeaders := lnkdsipmsg.Headers.ValuesWithHeaderPrefix("P-")
-	for k, vs := range pHeaders {
-		for _, v := range vs {
-			sipHdrs.Add(k, v)
-		}
-	}
-
-	// Set INVITE message extra headers
-	// for _, header := range SIPConfig.ExtraINVITEHeaders {
-	// 	sipHdrs.Add(header, sipMsg.Headers.Value(header))
-	// }
-
-	// P-Asserted-Identity Header
-	if RMatch(lnkdsipmsg.Headers.ValueHeader(P_Asserted_Identity), NameAndNumber, &mtch) {
-		nm = DropVisualSeparators(TrimWithSuffix(mtch[1], " "))
-		nmbr = DropVisualSeparators(mtch[2])
-		sipHdrs.AddHeader(P_Asserted_Identity, fmt.Sprintf("%s<sip:%s@%s;transport=udp>", nm, nmbr, localsocket))
-	}
-
-	// Max-Forwards Header
-	var maxForwards int
-	if trans.ResetMF {
-		maxForwards = 70
-		trans.ResetMF = false
-	} else {
-		maxForwards = lnkdsipmsg.MaxFwds - 1
-	}
-	sipmsg.MaxFwds = maxForwards
-	sipHdrs.SetHeader(Max_Forwards, fmt.Sprintf("%d", maxForwards))
-}
-
 func (session *SipSession) PrepareRequestHeaders(trans *Transaction, rqstpk RequestPack, sipmsg *SipMessage) {
 	hdrs := NewSHsPointer(true)
 	sipmsg.Headers = hdrs
@@ -842,7 +728,7 @@ func (session *SipSession) PrepareRequestHeaders(trans *Transaction, rqstpk Requ
 
 	// Max-Forwards
 	var maxFwds int
-	if rqstpk.Max70 || session.LinkedSession == nil || trans.ResetMF {
+	if rqstpk.Max70 || trans.ResetMF {
 		maxFwds = 70
 	} else {
 		if trans.LinkedTransaction == nil {
@@ -886,16 +772,8 @@ func (session *SipSession) ProcessRequestHeaders(trans *Transaction, sipmsg *Sip
 	}
 
 	// Add Reason header for CANCEL or BYE requests
-	if sipmsg.StartLine.Method == CANCEL || sipmsg.StartLine.Method == BYE {
-		if !hdrs.HeaderExists("Reason") {
-			if session.LinkedSession == nil || trans.LinkedTransaction == nil {
-				hdrs.AddHeader(Reason, "Q.850;cause=16")
-			} else if reason := trans.LinkedTransaction.RequestMessage.Headers.ValueHeader(Reason); reason != "" {
-				hdrs.AddHeader(Reason, reason)
-			} else {
-				hdrs.AddHeader(Reason, "Q.850;cause=16")
-			}
-		}
+	if (sipmsg.StartLine.Method == CANCEL || sipmsg.StartLine.Method == BYE) && !hdrs.HeaderExists("Reason") {
+		hdrs.AddHeader(Reason, "Q.850;cause=16")
 	}
 
 	// Set Content-Type and Content-Length based on the message body
@@ -1068,41 +946,21 @@ func CheckPendingTransaction(ss *SipSession, tx *Transaction) {
 			return
 		}
 		if ss.Mymode == mode.Multimedia && ss.Direction == INBOUND && tx.Direction == OUTBOUND && tx.IsProbing { //means my in-dialogue probing OPTIONS
-			ss.ReleaseCall("Probing timed-out")
+			ss.ReleaseMe("Probing timed-out")
 		}
 	case INVITE:
 		if ss.IsPending() {
 			ss.SetState(state.TimedOut)
 			ss.DropMe()
 		}
-		if lnkdss := ss.LinkedSession; lnkdss != nil {
-			if lnkdss.Direction == OUTBOUND && lnkdss.Received200() {
-				lnkdss.SendRequest(ACK, nil, EmptyBody())
-				lnkdss.WaitMS(100)
-				lnkdss.SetState(state.BeingDropped)
-				lnkdss.SendRequestDetailed(RequestPack{Method: BYE, CustomHeaders: NewSHQ850OrSIP(487, "Inbound INVITE timed-out", "")}, nil, EmptyBody())
-				return
-			}
-			lnkdss.RerouteRequest(NewResponsePackSRW(408, "Outbound INVITE timed-out", ""))
-		}
 	case CANCEL, BYE:
 		ss.FinalizeState()
 		ss.DropMe()
 	case PRACK:
-		ss.StopNoTimers()
-		lnkdss := ss.LinkedSession
-		lnkdss.RerouteRequest(NewResponsePackSRW(408, "Outbound PRACK timed-out", ""))
 		ss.SetState(state.Failed)
 		ss.DropMe()
 	default:
-		lnkdss := ss.LinkedSession
-		s1, s2 := ss.ReleaseCall(fmt.Sprintf("In-dialogue %s timed-out", tx.Method.String()))
-		if !s1 {
-			ss.DropMe()
-		}
-		if !s2 && lnkdss != nil {
-			lnkdss.DropMe()
-		}
+		ss.ReleaseMe(fmt.Sprintf("In-dialogue %s timed-out", tx.Method.String()))
 	}
 }
 
@@ -1127,82 +985,6 @@ func (ss *SipSession) ChecknSetDialogueChanging(newflag bool) bool {
 
 // ==================================================================
 
-// Unsafe
-func (ss *SipSession) setTimerPointer(tt TimerType, tmr *SipTimer) {
-	if tt == NoAnswer {
-		ss.noAnsSTimer = tmr
-	} else {
-		ss.no18xSTimer = tmr
-	}
-}
-
-// Unsafe
-func (ss *SipSession) getTimerPointer(tt TimerType) *SipTimer {
-	if tt == NoAnswer {
-		return ss.noAnsSTimer
-	} else {
-		return ss.no18xSTimer
-	}
-}
-
-func (ss *SipSession) StartTimer(tt TimerType) {
-	ss.multiUseMutex.Lock()
-	defer ss.multiUseMutex.Unlock()
-	if (tt == NoAnswer && ss.noAnsSTimer != nil) || (tt == No18x && ss.no18xSTimer != nil) {
-		return
-	}
-	var delay uint16
-	if tt == NoAnswer {
-		delay = ss.RoutingData.NoAnswerTimeout
-	} else {
-		delay = ss.RoutingData.No18xTimeout
-	}
-	tmr := &SipTimer{
-		DoneCh: make(chan bool),
-		Tmr:    time.NewTimer(time.Duration(delay) * time.Second),
-	}
-	ss.setTimerPointer(tt, tmr)
-	go ss.TimerHandler(tt)
-}
-
-func (ss *SipSession) StopTimer(tt TimerType) {
-	ss.multiUseMutex.Lock()
-	defer ss.multiUseMutex.Unlock()
-	siptmr := ss.getTimerPointer(tt)
-	if siptmr == nil {
-		return
-	}
-	if siptmr.Tmr.Stop() {
-		close(siptmr.DoneCh)
-	}
-}
-
-func (ss *SipSession) StopNoTimers() {
-	ss.StopTimer(No18x)
-	ss.StopTimer(NoAnswer)
-}
-
-func (ss *SipSession) TimerHandler(ttt TimerType) {
-	tmr := ss.getTimerPointer(ttt)
-	select {
-	case <-tmr.DoneCh:
-		ss.multiUseMutex.Lock()
-		defer ss.multiUseMutex.Unlock()
-		ss.setTimerPointer(ttt, nil)
-		return
-	case <-tmr.Tmr.C:
-	}
-	ss.multiUseMutex.Lock()
-	close(tmr.DoneCh)
-	ss.setTimerPointer(ttt, nil)
-	ss.multiUseMutex.Unlock()
-	lnkdss := ss.LinkedSession
-	ss.CancelMe(q850.NoAnswerFromUser, ttt.Details())
-	lnkdss.RerouteRequest(NewResponsePackSRW(487, ttt.Details(), ""))
-}
-
-// ------------------------------------------------------------------------------
-
 func (ss *SipSession) StartInDialogueProbing() {
 	if InDialogueProbingSec == 0 {
 		LogWarning(LTConfiguration, "Probing duration is set to ZERO - Skipped")
@@ -1215,18 +997,13 @@ func (ss *SipSession) StartInDialogueProbing() {
 }
 
 func (ss *SipSession) StartMaxCallDuration() {
-	if ss.RoutingData == nil {
-		LogWarning(LTSystem, "Max call duration not started - missing RoutingData")
-		return
-	}
-	mxD := ss.RoutingData.MaxCallDuration
-	if mxD == 0 {
+	if MaxCallDurationSec == 0 {
 		LogWarning(LTConfiguration, "Max call duration is set to ZERO - Skipped")
 		return
 	}
 	ss.multiUseMutex.Lock()
 	defer ss.multiUseMutex.Unlock()
-	ss.maxDurationTimer = time.NewTimer(time.Duration(mxD) * time.Second)
+	ss.maxDurationTimer = time.NewTimer(time.Duration(MaxCallDurationSec) * time.Second)
 	go ss.maxDurationTimerHandler(ss.maxDprobDoneChan, ss.maxDurationTimer.C)
 }
 
@@ -1244,7 +1021,7 @@ func (ss *SipSession) maxDurationTimerHandler(doneChan chan bool, tmrChan <-chan
 	select {
 	case <-doneChan:
 	case <-tmrChan:
-		ss.ReleaseCall("Max call duration reached")
+		ss.ReleaseMe("Max call duration reached")
 	}
 }
 
@@ -1292,25 +1069,7 @@ func (session *SipSession) IsPending() bool {
 	return session.state.IsPending()
 }
 
-func (session *SipSession) IsLinked() bool {
-	return session.LinkedSession != nil
-}
-
 // ==============================================================================
-
-func (ss *SipSession) ReleaseCall(details string) (s1 bool, s2 bool) {
-	if ss.IsEstablished() {
-		ss.SetState(state.BeingDropped)
-		ss.SendRequestDetailed(RequestPack{Method: BYE, Max70: true, CustomHeaders: NewSHQ850OrSIP(0, details, "")}, nil, EmptyBody())
-		s1 = true
-	}
-	if lnkss := ss.LinkedSession; lnkss != nil && lnkss.IsEstablished() {
-		lnkss.SetState(state.BeingDropped)
-		lnkss.SendRequestDetailed(RequestPack{Method: BYE, Max70: true, CustomHeaders: NewSHQ850OrSIP(0, details, "")}, nil, EmptyBody())
-		s2 = true
-	}
-	return
-}
 
 func (ss *SipSession) ReleaseMe(details string) bool {
 	if ss.IsEstablished() {
@@ -1321,27 +1080,12 @@ func (ss *SipSession) ReleaseMe(details string) bool {
 	return false
 }
 
-func (ss *SipSession) ReleaseEarlyFinalCall(details string) (s1 bool, s2 bool) {
-	if ss.IsBeingEstablished() {
-		ss.SetState(state.BeingFailed)
-		ss.SendResponseDetailed(nil, ResponsePack{StatusCode: status.NotAcceptable, CustomHeaders: NewSHQ850OrSIP(0, details, "")}, EmptyBody())
-		s1 = true
-	}
-	if lnkss := ss.LinkedSession; lnkss != nil && lnkss.IsEstablished() {
-		lnkss.SetState(state.BeingDropped)
-		lnkss.SendRequestDetailed(RequestPack{Method: BYE, Max70: true, CustomHeaders: NewSHQ850OrSIP(0, details, "")}, nil, EmptyBody())
-		s2 = true
-	}
-	return
-}
-
 // Cancel outgoing INVITE
 func (session *SipSession) CancelMe(q850 int, details string) bool {
 	if session.Direction != OUTBOUND {
 		return false
 	}
 	if session.IsBeingEstablished() {
-		session.StopNoTimers()
 		session.SetState(state.BeingCancelled)
 		if q850 == -1 || details == "" {
 			session.SendRequest(CANCEL, nil, EmptyBody())

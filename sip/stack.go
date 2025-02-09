@@ -457,10 +457,6 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				}
 				ss.StartMaxCallDuration()
 				ss.StartInDialogueProbing()
-				if lnkdss := ss.LinkedSession; lnkdss != nil { //call answered - need to propagate ACK
-					lnkdss.FinalizeState()
-					lnkdss.SendRequest(ACK, nil, *sipmsg.Body)
-				}
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)
@@ -474,15 +470,6 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			}
 			ss.SetState(state.BeingCancelled)
 			ss.SendResponse(trans, 200, EmptyBody())
-			if lnkdss := ss.LinkedSession; lnkdss != nil {
-				lnkdss.StopAllOutTransactions()
-				if lnkdss.IsEstablished() {
-					lnkdss.SetState(state.BeingCleared)
-					lnkdss.SendRequest(BYE, nil, EmptyBody())
-				} else {
-					lnkdss.CancelMe(-1, "")
-				}
-			}
 			ss.SendResponseDetailed(nil, ResponsePack{StatusCode: 487, CustomHeaders: NewSHQ850OrSIP(487, "", "")}, EmptyBody())
 		case BYE:
 			if !ss.IsEstablished() {
@@ -492,18 +479,6 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			ss.SetState(state.Cleared)
 			ss.SendResponse(trans, status.OK, EmptyBody())
 			ss.DropMe()
-			if lnkdss := ss.LinkedSession; lnkdss != nil {
-				if lnkdss.IsEstablished() {
-					lnkdss.SetState(state.BeingCleared)
-					lnkdss.SendRequest(BYE, trans, EmptyBody())
-					return
-				}
-				if lnkdss.IsBeingEstablished() {
-					lnkdss.SetState(state.BeingRejected)
-					lnkdss.SendResponse(nil, status.ServiceUnavailable, EmptyBody())
-					return
-				}
-			}
 		case OPTIONS:
 			if sipmsg.IsOutOfDialgoue() { // incoming probing
 				ss.SetState(state.Probed)
@@ -518,33 +493,13 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.SendResponse(trans, 200, EmptyBody()) //handle in-dialogue locally
 				return
 			}
-			lnkdss := ss.LinkedSession
-			if !ss.ChecknSetDialogueChanging(true) || (lnkdss != nil && lnkdss.IsDialogueChanging()) {
-				ss.SendResponseDetailed(trans, NewResponsePackRFWarning(status.RequestPending, "", "Competing Update rejected"), EmptyBody())
-				return
-			}
-			if lnkdss != nil {
-				lnkdss.SendRequest(UPDATE, trans, *sipmsg.Body)
-			}
+			// TODO handle similarly like ReINVITE
 		case PRACK:
 			ss.SendResponse(trans, status.OK, EmptyBody())
-			if lnkdss := ss.LinkedSession; lnkdss != nil {
-				lnkdss.SendRequest(PRACK, trans.LinkedTransaction, *sipmsg.Body)
-			}
-		case REFER:
-			lnkdss := ss.LinkedSession
-			if !ss.IsEstablished() || !lnkdss.IsEstablished() {
-				ss.SendResponseDetailed(trans, NewResponsePackRFWarning(status.TemporarilyUnavailable, "", "REFER received during early dialogue"), EmptyBody())
-				return
-			}
-			ss.HandleRefer(trans, sipmsg) //process Refer-To RURI and route the call
-		case NOTIFY:
-			ss.SendResponse(trans, status.MethodNotAllowed, EmptyBody())
 		case INFO:
-			if lnkdss := ss.LinkedSession; lnkdss != nil {
-				lnkdss.SendRequest(INFO, trans, *sipmsg.Body)
-			}
-		default: // REGISTER, SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
+			// TODO handle this
+			ss.SendResponse(trans, status.OK, EmptyBody())
+		default: //REFER, REGISTER, SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
 			ss.SetState(state.Dropped)
 			ss.SendResponse(trans, status.MethodNotAllowed, EmptyBody())
 			ss.DropMe()
@@ -554,111 +509,30 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 		if stsCode <= 199 && trans.Method != INVITE {
 			return
 		}
-		if lnkdss := ss.LinkedSession; lnkdss != nil {
-			switch {
-			case 180 <= stsCode && stsCode <= 189:
-				ss.StopTimer(No18x)
-				rspspk := ResponsePack{StatusCode: stsCode}
-				if sipmsg.IsOptionRequired("100rel") {
-					rspspk.LinkedPRACKST = ss.GenerateOutgoingPRACKST(sipmsg)
-				}
-				lnktrans := lnkdss.GetLastUnACKedINVSYNC(INBOUND)
-				if !lnktrans.StatusCodeExistsSYNC(stsCode) {
-					lnkdss.SendResponseDetailed(lnktrans, rspspk, *sipmsg.Body)
-				}
-			case stsCode <= 199:
-				ss.StartTimer(No18x)
-				ss.StartTimer(NoAnswer)
-			case stsCode <= 299:
-				switch trans.Method {
-				case INVITE:
-					if !ss.IsBeingEstablished() {
-						ss.StopAllOutTransactions()
-						ss.SendRequest(ACK, nil, EmptyBody())
-						ss.WaitMS(100)
-						ss.SendRequestDetailed(RequestPack{Method: BYE, CustomHeaders: NewSHQ850OrSIP(487, "Call cancelled already", "")}, nil, EmptyBody())
-						return
-					}
-					ss.StopNoTimers()
-					lnkdss.SendResponse(nil, stsCode, *sipmsg.Body)
-				case CANCEL:
-				case OPTIONS: //probing or keepalive
-				case UPDATE:
-					ss.ChecknSetDialogueChanging(false)
-					lnkdss.ChecknSetDialogueChanging(false)
-					lnkdss.SendResponse(trans.LinkedTransaction, stsCode, *sipmsg.Body)
-				case ReINVITE:
-					lnkdss.SendResponse(trans.LinkedTransaction, stsCode, *sipmsg.Body)
-				case BYE:
-					ss.StopAllOutTransactions()
+		switch {
+		case 180 <= stsCode && stsCode <= 189:
+		case stsCode <= 199:
+		case stsCode <= 299:
+			switch trans.Method {
+			case INFO:
+			case OPTIONS: //probing or keepalive
+				if ss.Mymode == mode.KeepAlive {
 					ss.FinalizeState()
+					ss.RemoteUserAgent.IsAlive = true
 					ss.DropMe()
-				case INFO:
 				}
-			case stsCode <= 399:
-				switch trans.Method {
-				case INVITE:
-					ss.StopNoTimers()
-					ss.Ack3xxTo6xx(state.Redirected)
-					lnkdss.RerouteRequest(NewResponsePackSRW(stsCode, "Call redirected but forbidden", ""))
-				default:
-					LogWarning(LTSIPStack, "Received 3xx response on non-INVITE message")
-					if trans.Method == CANCEL || trans.Method == BYE {
-						ss.DropMe()
-						return
-					}
-					ss.FinalizeState()
-					ss.ReleaseCall("Exotic 3xx response received on non-INVITE")
-				}
-			default: // 400-699
-				switch trans.Method {
-				case INVITE:
-					switch ss.GetState() {
-					case state.BeingEstablished:
-						ss.StopNoTimers()
-						ss.Ack3xxTo6xx(state.Rejected)
-						lnkdss.RerouteRequest(NewResponsePackSRW(stsCode, "Call failed or rejected", sipmsg.Headers.ValueHeader(Reason)))
-					case state.BeingCancelled:
-						ss.Ack3xxTo6xxFinalize()
-					}
-				case ReINVITE, UPDATE:
-					lnkdss.SendResponse(trans.LinkedTransaction, stsCode, *sipmsg.Body)
-				case BYE:
-					ss.StopAllOutTransactions()
-					ss.FinalizeState()
-					ss.DropMe()
-				case OPTIONS: //probing or keepalive
-					if trans.IsProbing && (stsCode == 408 || stsCode == 481) {
-						ss.ReleaseCall("Probing rejected but unexpectedly")
-					}
-				}
+			case BYE:
+				ss.StopAllOutTransactions()
+				ss.FinalizeState()
+				ss.DropMe()
 			}
-		} else {
-			switch {
-			case 180 <= stsCode && stsCode <= 189:
-			case stsCode <= 199:
-			case stsCode <= 299:
-				switch trans.Method {
-				case INFO:
-				case OPTIONS: //probing or keepalive
-					if ss.Mymode == mode.KeepAlive {
-						ss.FinalizeState()
-						ss.RemoteUserAgent.IsAlive = true
-						ss.DropMe()
-					}
-				case BYE:
-					ss.StopAllOutTransactions()
+		case stsCode <= 399:
+		default: // 400-699
+			switch trans.Method {
+			case OPTIONS: //probing or keepalive
+				if ss.Mymode == mode.KeepAlive {
 					ss.FinalizeState()
 					ss.DropMe()
-				}
-			case stsCode <= 399:
-			default: // 400-699
-				switch trans.Method {
-				case OPTIONS: //probing or keepalive
-					if ss.Mymode == mode.KeepAlive {
-						ss.FinalizeState()
-						ss.DropMe()
-					}
 				}
 			}
 		}

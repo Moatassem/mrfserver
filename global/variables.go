@@ -38,8 +38,9 @@ const (
 	DeltaRune            rune   = 'a' - 'A'
 	MagicCookie          string = "z9hG4bK"
 	AllowedMethods       string = "INVITE, PRACK, ACK, CANCEL, BYE, OPTIONS, UPDATE, INFO, NOTIFY, MESSAGE"
-	SessionDropDelaySec  int    = 4   //seconds
-	InDialogueProbingSec int    = 300 //seconds
+	SessionDropDelaySec  int    = 4
+	InDialogueProbingSec int    = 300
+	MaxCallDurationSec   int    = 7200
 	MinMaxFwds           int    = 2
 )
 
