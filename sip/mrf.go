@@ -135,10 +135,7 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	ss.RemoteMedia = rmedia
 	ss.IsCallHeld = sdpses.IsCallHeld()
 
-	// reserve a local UDP port
-	// TODO need to ask OS if this port is really available!!!
 	// TODO need to handle incoming ReINVITE and UPDPATE
-	// TODO need to negotiate media-directive properly
 	// need to handle CANCEL (put some delay before answering?)
 	// need to handle INFO to play the required audio files
 	// need to handle DTMF
@@ -272,27 +269,31 @@ func (ss *SipSession) mediaReceiver() {
 
 func (ss *SipSession) startRTPStreaming() {
 	tckr := time.NewTicker(20 * time.Millisecond)
-	defer tckr.Stop()
+	defer func() {
+		tckr.Stop()
+		ss.isrtpstreaming = false
+	}()
 
 	Marker := true
-	ss.rtpIndex = 0
+	// ss.rtpIndex = 0 // TODO put it zero if file change
 	audiopayloadsize := 160
 
-	filename := "Ba3dSeneen.raw"
+	// filename := "Ba3dSeneen.raw"
+	filename := "MayserreemRingTone.raw"
 	data, ok := MRFRepos.Get("999", filename)
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename)
 		return
 	}
+	ss.isrtpstreaming = true
 	for {
 		select {
 		case <-ss.rtpChan:
 			return
 		case <-tckr.C:
-			// default:
 		}
 		if ss.IsCallHeld {
-			break
+			return
 		}
 		ss.rtpTimeStmp += uint32(audiopayloadsize)
 		// buf := MediaBufferPool.Get().(*[]byte)
@@ -309,11 +310,13 @@ func (ss *SipSession) startRTPStreaming() {
 		var payload []byte
 		if audiopayloadsize <= delta {
 			payload = (*data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
+			ss.rtpIndex += audiopayloadsize
 		} else {
 			payload = (*data)[ss.rtpIndex : ss.rtpIndex+delta]
 			for n := delta; n < audiopayloadsize; n++ {
 				payload = append(payload, 251)
 			}
+			ss.rtpIndex += delta
 		}
 
 		pkt = append(pkt, 128)
@@ -324,7 +327,6 @@ func (ss *SipSession) startRTPStreaming() {
 		pkt = append(pkt, payload...)
 
 		ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
-		ss.rtpIndex += audiopayloadsize
 		ss.rtpSequenceNum++
 		Marker = false
 	}

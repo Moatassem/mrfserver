@@ -75,6 +75,7 @@ type SipSession struct {
 	rtpSSRC        uint32
 	rtpIndex       int
 	rtpPayload     uint8
+	isrtpstreaming bool
 
 	FwdCSeq uint32
 	BwdCSeq uint32

@@ -81,10 +81,10 @@ func (s *Session) IsCallHeld() bool {
 	} else if s.Mode != "" {
 		mode = s.Mode
 	} else {
-		return false
+		mode = SendRecv
 	}
-	if mode == RecvOnly || mode == SendRecv {
-		return false
+	if mode == SendOnly || mode == Inactive {
+		return true
 	}
 	if ipv4 := s.GetEffectiveConnection(); ipv4 == "" || ipv4 == "0.0.0.0" {
 		return true
