@@ -50,6 +50,18 @@ func (s *Session) GetChosenMedia() *Media {
 	return nil
 }
 
+func (s *Session) GetEffectiveConnection() string {
+	media := s.GetChosenMedia()
+	var ipv4 string
+	for i := 0; i < len(media.Connection); i++ {
+		ipv4 = media.Connection[i].Address
+		if ipv4 != "" {
+			return ipv4
+		}
+	}
+	return s.Connection.Address
+}
+
 func (s *Session) GetEffectiveMediaDirective() string {
 	media := s.GetChosenMedia()
 	if media.Mode != "" {
@@ -59,6 +71,25 @@ func (s *Session) GetEffectiveMediaDirective() string {
 		return s.Mode
 	}
 	return SendRecv
+}
+
+func (s *Session) IsCallHeld() bool {
+	media := s.GetChosenMedia()
+	var mode string
+	if media.Mode != "" {
+		mode = media.Mode
+	} else if s.Mode != "" {
+		mode = s.Mode
+	} else {
+		return false
+	}
+	if mode == RecvOnly || mode == SendRecv {
+		return false
+	}
+	if ipv4 := s.GetEffectiveConnection(); ipv4 == "" || ipv4 == "0.0.0.0" {
+		return true
+	}
+	return false
 }
 
 // Origin represents an originator of the session.

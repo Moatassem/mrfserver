@@ -60,13 +60,21 @@ type SipSession struct {
 	RemoteUDP        *net.UDPAddr
 	RemoteContactUDP *net.UDPAddr
 	RecordRouteUDP   *net.UDPAddr
-	UDPListenser     *net.UDPConn
+	SIPUDPListenser  *net.UDPConn
 	RemoteUserAgent  *SipUdpUserAgent
 
 	RemoteMedia    *net.UDPAddr
-	LocalSocket    *MediaSocket
+	MediaListener  *net.UDPConn
 	LocalSDP       *sdp.Session
 	WithTeleEvents bool
+	IsCallHeld     bool
+	rtpChan        chan bool
+	rtpRFC4733TS   uint32
+	rtpSequenceNum uint16
+	rtpTimeStmp    uint32
+	rtpSSRC        uint32
+	rtpIndex       int
+	rtpPayload     uint8
 
 	FwdCSeq uint32
 	BwdCSeq uint32
@@ -94,6 +102,7 @@ func NewSS(dir Direction) *SipSession {
 	ss := &SipSession{
 		Direction:        dir,
 		maxDprobDoneChan: make(chan bool),
+		rtpChan:          make(chan bool),
 	}
 	return ss
 }
@@ -387,7 +396,7 @@ func (session *SipSession) PrepareSARequestHeaders(st *Transaction, rqstpk Reque
 }
 
 func (session *SipSession) BuildSARequestHeaders(st *Transaction, rqstpk RequestPack, sipmsg *SipMessage) {
-	localsocket := GenerateUDPSocket(session.UDPListenser)
+	localsocket := GetUDPAddrFromConn(session.SIPUDPListenser)
 	localIP := localsocket.IP
 	remoteIP := session.RemoteUDP.IP
 
@@ -408,7 +417,7 @@ func (session *SipSession) BuildSARequestHeaders(st *Transaction, rqstpk Request
 	hdrs.AddHeader(Call_ID, session.CallID)
 
 	// Set Via and Branch
-	hdrs.AddHeader(Via, fmt.Sprintf("%s;branch=%s", GenerateViaWithoutBranch(session.UDPListenser), st.ViaBranch))
+	hdrs.AddHeader(Via, fmt.Sprintf("%s;branch=%s", GenerateViaWithoutBranch(session.SIPUDPListenser), st.ViaBranch))
 
 	// Set From Header with tag
 	session.FromTag = guid.NewTag()
@@ -468,7 +477,7 @@ func (session *SipSession) CreateHeadersForResponse(trans *Transaction, rspnspk 
 
 	// Add Contact header
 	if rspnspk.ContactHeader == "" {
-		localsocket := GenerateUDPSocket(session.UDPListenser)
+		localsocket := GetUDPAddrFromConn(session.SIPUDPListenser)
 		hdrs.AddHeader(Contact, GenerateContact(localsocket))
 	} else {
 		hdrs.AddHeader(Contact, rspnspk.ContactHeader)
@@ -707,7 +716,7 @@ func (session *SipSession) PrepareRequestHeaders(trans *Transaction, rqstpk Requ
 	hdrs := NewSHsPointer(true)
 	sipmsg.Headers = hdrs
 
-	localsocket := GenerateUDPSocket(session.UDPListenser)
+	localsocket := GetUDPAddrFromConn(session.SIPUDPListenser)
 
 	sl := sipmsg.StartLine
 	sl.Ruri = session.RemoteContactURI
@@ -750,7 +759,7 @@ func (session *SipSession) PrepareRequestHeaders(trans *Transaction, rqstpk Requ
 	// Add Contact, Call-ID, and Via headers
 	hdrs.SetHeader(Contact, GenerateContact(localsocket))
 	hdrs.SetHeader(Call_ID, session.CallID)
-	hdrs.AddHeader(Via, fmt.Sprintf("%s;branch=%s", GenerateViaWithoutBranch(session.UDPListenser), trans.ViaBranch))
+	hdrs.AddHeader(Via, fmt.Sprintf("%s;branch=%s", GenerateViaWithoutBranch(session.SIPUDPListenser), trans.ViaBranch))
 }
 
 func (session *SipSession) ProcessRequestHeaders(trans *Transaction, sipmsg *SipMessage, rqstpk RequestPack, msgBody MessageBody) {
@@ -924,13 +933,13 @@ func (session *SipSession) Send(tx *Transaction) {
 		tx.SentMessage.PrepareMessageBytes(session)
 	}
 	if tx.SentMessage.IsRequest() && session.RemoteContactUDP != nil {
-		_, err := session.UDPListenser.WriteToUDP(tx.SentMessage.Body.MessageBytes, session.RemoteContactUDP)
+		_, err := session.SIPUDPListenser.WriteToUDP(tx.SentMessage.Body.MessageBytes, session.RemoteContactUDP)
 		if err != nil {
 			LogError(LTSystem, "Failed to send message: "+err.Error())
 		}
 		return
 	}
-	_, err := session.UDPListenser.WriteToUDP(tx.SentMessage.Body.MessageBytes, session.RemoteUDP)
+	_, err := session.SIPUDPListenser.WriteToUDP(tx.SentMessage.Body.MessageBytes, session.RemoteUDP)
 	if err != nil {
 		LogError(LTSystem, "Failed to send message: "+err.Error())
 	}
@@ -1147,8 +1156,9 @@ func (session *SipSession) DropMe() {
 	}
 	fmt.Println("Session:", session.CallID, "State:", session.state.String())
 	session.IsDisposed = true
-	MediaPorts.ReleaseSocket(session.LocalSocket)
+	MediaPorts.ReleaseSocket(session.MediaListener)
 	close(session.maxDprobDoneChan)
+	close(session.rtpChan)
 	Sessions.Delete(session.CallID)
 }
 

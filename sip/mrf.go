@@ -20,9 +20,12 @@ import (
 	"SRGo/sdp"
 	"SRGo/sip/state"
 	"SRGo/sip/status"
+	"encoding/binary"
 	"fmt"
+	"math"
 	"net"
 	"slices"
+	"time"
 )
 
 func getURIUsername(uri string) string {
@@ -33,7 +36,7 @@ func getURIUsername(uri string) string {
 	return ""
 }
 
-func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMessage) {
+func (ss *SipSession) RouteRequestInternal(trans *Transaction, sipmsg1 *SipMessage) {
 	defer func() {
 		if r := recover(); r != nil {
 			LogCallStack(r)
@@ -43,20 +46,21 @@ func (ss1 *SipSession) RouteRequestInternal(trans1 *Transaction, sipmsg1 *SipMes
 	upart := sipmsg1.StartLine.UserPart
 
 	if !sipmsg1.Body.ContainsSDP() {
-		ss1.RejectMe(trans1, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP or delayed offer")
+		ss.RejectMe(trans, status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported SDP or delayed offer")
 		return
 	}
 
-	// if ivr, ok := ivr.IVRsRepo.Get(upart); ok {
+	if !MRFRepos.DoesMRFRepoExist(upart) {
+		ss.RejectMe(trans, status.NotFound, q850.UnallocatedNumber, "MRF Repository not found")
+		return
+	}
 
-	ss1.AnswerMRF(trans1, sipmsg1, upart)
-
-	// ss1.RejectMe(trans1, status.NotFound, q850.UnallocatedNumber, "No target found")
+	ss.answerMRF(trans, sipmsg1)
 }
 
 // ============================================================================
-// MRF functions
-func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int, warn string) {
+// MRF methods
+func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int, warn string) {
 	sdpbytes, _ := sipmsg.GetBodyPart(SDP)
 	sdpses, err := sdp.Parse(sdpbytes)
 	if err != nil {
@@ -76,7 +80,7 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 		}
 		for j := 0; j < len(media.Connection); j++ {
 			connection := media.Connection[j]
-			if connection.Address == "0.0.0.0" || connection.Type != sdp.TypeIPv4 || connection.Network != sdp.NetworkInternet {
+			if connection.Type != sdp.TypeIPv4 || connection.Network != sdp.NetworkInternet { //connection.Address == "0.0.0.0"
 				continue
 			}
 			conn = connection
@@ -129,6 +133,7 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	}
 
 	ss.RemoteMedia = rmedia
+	ss.IsCallHeld = sdpses.IsCallHeld()
 
 	// reserve a local UDP port
 	// TODO need to ask OS if this port is really available!!!
@@ -138,10 +143,10 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	// need to handle INFO to play the required audio files
 	// need to handle DTMF
 	// TODO need to build RTP packets and stream media back
-	if ss.LocalSocket == nil {
-		ss.LocalSocket = MediaPorts.ReserveSocket(ServerIPv4)
+	if ss.MediaListener == nil {
+		ss.MediaListener = MediaPorts.ReserveSocket()
 	}
-	if ss.LocalSocket == nil {
+	if ss.MediaListener == nil {
 		sipcode = status.NotAcceptableHere
 		q850code = q850.ResourceUnavailableUnspecified
 		warn = "Media pool depleted"
@@ -155,7 +160,7 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 			SessionVersion: 1, // will be updated by updateSDPPart in PrepareMessageBytes
 			Network:        sdp.NetworkInternet,
 			Type:           sdp.TypeIPv4,
-			Address:        ServerIPv4,
+			Address:        ServerIPv4.String(),
 		},
 		Name: "MRF",
 		// Information: "A Seminar on the session description protocol",
@@ -165,7 +170,7 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 		Connection: &sdp.Connection{
 			Network: sdp.NetworkInternet,
 			Type:    sdp.TypeIPv4,
-			Address: ServerIPv4,
+			Address: ServerIPv4.String(),
 			TTL:     0,
 		},
 		// Bandwidth: []*Bandwidth{
@@ -198,7 +203,7 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 			newmedia = &sdp.Media{
 				Chosen:     true,
 				Type:       "audio",
-				Port:       ss.LocalSocket.Port,
+				Port:       GetUDPortFromConn(ss.MediaListener),
 				Proto:      "RTP/AVP",
 				Format:     []*sdp.Format{audioFormat},
 				Attributes: []*sdp.Attr{{Name: "ptime", Value: "20"}},
@@ -212,32 +217,140 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 		mySDP.Media = append(mySDP.Media, newmedia)
 	}
 	ss.LocalSDP = mySDP
+	ss.rtpPayload = audioFormat.Payload
 	return
 }
 
-func (ss *SipSession) AnswerMRF(trans *Transaction, sipmsg *SipMessage, upart string) {
-	if sc, qc, wr := ss.BuildSDPAnswer(sipmsg); sc != 0 {
+func (ss *SipSession) answerMRF(trans *Transaction, sipmsg *SipMessage) {
+	if sc, qc, wr := ss.buildSDPAnswer(sipmsg); sc != 0 {
 		ss.RejectMe(trans, sc, qc, wr)
 		return
 	}
+
+	ss.rtpSSRC = RandomNum(2000, 9000000)
+	ss.rtpSequenceNum = uint16(RandomNum(1000, 2000))
+	ss.rtpTimeStmp = 0
+
 	ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
 }
 
-// ==
-func (ss *SipSession) HandleRefer(trans *Transaction, sipmsg *SipMessage) {
-	referRuri, err := sipmsg.GetReferToRUIR()
-	if err != nil {
-		ss.SendResponseDetailed(trans, NewResponsePackRFWarning(status.BadRequest, "", err.Error()), EmptyBody())
+func (ss *SipSession) mediaReceiver() {
+	for {
+		if ss.MediaListener == nil {
+			return
+		}
+		buf := MediaBufferPool.Get().(*[]byte)
+		n, addr, err := ss.MediaListener.ReadFromUDP(*buf)
+		if err != nil {
+			if buf != nil {
+				MediaBufferPool.Put(buf)
+			}
+			if opErr, ok := err.(*net.OpError); ok {
+				_ = opErr
+				return
+			}
+			// if errors.Is(err, *net.OpError)
+			fmt.Println(err)
+			continue
+		}
+		bytes := (*buf)[:n]
+		MediaBufferPool.Put(buf)
+		if !AreUAddrsEqual(addr, ss.RemoteMedia) {
+			fmt.Println("Received RTP from unknown remote connection")
+			continue
+		}
+		if n == 16 {
+			ts := binary.BigEndian.Uint32(bytes[4:8]) //TODO check how to use IsSystemBigEndian
+			if ss.rtpRFC4733TS != ts {
+				dtmf := DicDTMFEvent[bytes[12]]
+				fmt.Printf("RFC 4733 Received: %s\n", dtmf)
+				ss.rtpRFC4733TS = ts
+			}
+		}
+	}
+}
+
+func (ss *SipSession) startRTPStreaming() {
+	tckr := time.NewTicker(20 * time.Millisecond)
+	defer tckr.Stop()
+
+	Marker := true
+	ss.rtpIndex = 0
+	audiopayloadsize := 160
+
+	filename := "Ba3dSeneen.raw"
+	data, ok := MRFRepos.Get("999", filename)
+	if !ok {
+		fmt.Printf("Cannot find file [%s]\n", filename)
 		return
 	}
+	for {
+		select {
+		case <-ss.rtpChan:
+			return
+		case <-tckr.C:
+			// default:
+		}
+		if ss.IsCallHeld {
+			break
+		}
+		ss.rtpTimeStmp += uint32(audiopayloadsize)
+		// buf := MediaBufferPool.Get().(*[]byte)
+		// pkt := (*buf)[:172]
+		// MediaBufferPool.Put(buf)
 
-	ss.ReferSubscription = !sipmsg.WithNoReferSubscription()
-	if ss.ReferSubscription {
-		ss.Relayed18xNotify = nil
+		pkt := make([]byte, 0, audiopayloadsize+12)
+
+		if ss.rtpSequenceNum == math.MaxUint16 {
+			ss.rtpSequenceNum = 0
+		}
+
+		delta := len(*data) - ss.rtpIndex
+		var payload []byte
+		if audiopayloadsize <= delta {
+			payload = (*data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
+		} else {
+			payload = (*data)[ss.rtpIndex : ss.rtpIndex+delta]
+			for n := delta; n < audiopayloadsize; n++ {
+				payload = append(payload, 251)
+			}
+		}
+
+		pkt = append(pkt, 128)
+		pkt = append(pkt, bool2byte(Marker)*128+ss.rtpPayload)
+		pkt = append(pkt, uint16ToBytes(ss.rtpSequenceNum)...)
+		pkt = append(pkt, uint32ToBytes(ss.rtpTimeStmp)...)
+		pkt = append(pkt, uint32ToBytes(ss.rtpSSRC)...)
+		pkt = append(pkt, payload...)
+
+		ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
+		ss.rtpIndex += audiopayloadsize
+		ss.rtpSequenceNum++
+		Marker = false
 	}
+}
 
-	fmt.Println(referRuri)
-	ss.SendResponse(trans, status.OK, EmptyBody())
+func bool2byte(b bool) byte {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func uint16ToBytes(num uint16) []byte {
+	bytes := make([]byte, 2)
+	binary.BigEndian.PutUint16(bytes, num)
+	return bytes
+}
+
+func uint32ToBytes(num uint32) []byte {
+	bytes := make([]byte, 4)
+	binary.BigEndian.PutUint32(bytes, num)
+	return bytes
+}
+
+func (ss *SipSession) stopRTPStreaming() {
+	ss.rtpChan <- true
 }
 
 // ============================================================================
@@ -248,7 +361,7 @@ func ProbeUA(conn *net.UDPConn, ua *SipUdpUserAgent) {
 	}
 	ss := NewSS(OUTBOUND)
 	ss.RemoteUDP = ua.UDPAddr
-	ss.UDPListenser = conn
+	ss.SIPUDPListenser = conn
 	ss.RemoteUserAgent = ua
 
 	hdrs := NewSipHeaders()

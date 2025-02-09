@@ -1,8 +1,9 @@
 module SRGo
 
-go 1.23.5
+go 1.23.6
 
 require (
+	github.com/gotranspile/g722 v0.0.0-20240123003956-384a1bb16a19
 	github.com/hajimehoshi/go-mp3 v0.3.4
 	github.com/prometheus/client_golang v1.20.5
 )

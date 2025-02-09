@@ -70,18 +70,29 @@ func StartListening(ip net.IP, prt int) (*net.UDPConn, error) {
 	return net.ListenUDP("udp", &socket)
 }
 
-func GenerateUDPSocket(conn *net.UDPConn) *net.UDPAddr {
+func GetUDPAddrFromConn(conn *net.UDPConn) *net.UDPAddr {
 	return conn.LocalAddr().(*net.UDPAddr)
+}
+
+func GetUDPortFromConn(conn *net.UDPConn) int {
+	return conn.LocalAddr().(*net.UDPAddr).Port
 }
 
 func BuildUDPSocket(ip string, prt int) (*net.UDPAddr, error) {
 	return net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ip, prt))
 }
 
+func AreUAddrsEqual(addr1, addr2 *net.UDPAddr) bool {
+	if addr1 == nil || addr2 == nil {
+		return addr1 == addr2
+	}
+	return addr1.IP.Equal(addr2.IP) && addr1.Port == addr2.Port && addr1.Zone == addr2.Zone
+}
+
 // ============================================================
 
 func GenerateViaWithoutBranch(conn *net.UDPConn) string {
-	udpsocket := GenerateUDPSocket(conn)
+	udpsocket := GetUDPAddrFromConn(conn)
 	return fmt.Sprintf("SIP/2.0/UDP %s", udpsocket)
 }
 
@@ -730,8 +741,6 @@ func (he HeaderEnum) Equals(h string) bool {
 }
 
 // ====================================================
-
-// func IsEqualResponse()
 
 func IsProvisional(sc int) bool {
 	return 100 <= sc && sc <= 199

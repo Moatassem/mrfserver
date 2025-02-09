@@ -167,6 +167,7 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 					sipmsg.ViaBranch = via[1]
 					if !strings.HasPrefix(via[1], MagicCookie) {
 						LogWarning(LTSIPStack, fmt.Sprintf("Received message [%v] having non-RFC3261 Via branch [%v]", startLine.Method.String(), via[1]))
+						fmt.Println(string(payload[:_dblCrLfIdx]))
 					}
 					if len(via[1]) <= len(MagicCookie) {
 						LogWarning(LTSIPStack, fmt.Sprintf("Received message [%v] having too short Via branch [%v]", startLine.Method.String(), via[1]))
@@ -439,7 +440,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				return
 			}
 			if sipmsg.Body.ContainsSDP() {
-				sc, qc, wr := ss.BuildSDPAnswer(sipmsg)
+				sc, qc, wr := ss.buildSDPAnswer(sipmsg)
 				if sc != 0 {
 					ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(sc, qc, wr), EmptyBody())
 					return
@@ -447,20 +448,24 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
 			} else {
 				// TODO if ReINVITE is delayed offer
+				ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported delayed offer"), EmptyBody())
 			}
 		case ACK:
 			if trans.Method == INVITE {
 				ss.FinalizeState()
-				if !ss.IsEstablished() { //call cleared - no need to propagate ACK, since clearing is handled locally per session
+				if !ss.IsEstablished() {
 					ss.DropMe()
 					return
 				}
 				ss.StartMaxCallDuration()
 				ss.StartInDialogueProbing()
+				go ss.mediaReceiver()
+				// ss.stopRTPStreaming()
+				go ss.startRTPStreaming()
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)
-					// TODO update connection to the new remote UDO if any and update codec streaming
+					// TODO update connection to the new codec streaming
 				}
 			}
 		case CANCEL:

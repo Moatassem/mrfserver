@@ -17,6 +17,7 @@ package global
 import (
 	"SRGo/cl"
 	"SRGo/prometheus"
+	"net"
 	"regexp"
 	"sync"
 )
@@ -45,10 +46,11 @@ const (
 )
 
 var (
-	ServerIPv4  string
-	SipUdpPort  int //TODO add a list of listening UDP ports if needed later, for now, it is a single port
-	HttpTcpPort int
-	RateLimit   int = -1 //TODO 2000 || 0 = switched off, -1 = unlimited, > 0 = limited
+	ServerIPv4        net.IP
+	SipUdpPort        int //TODO add a list of listening UDP ports if needed later, for now, it is a single port
+	HttpTcpPort       int
+	RateLimit         int = -1 //TODO 2000 || 0 = switched off, -1 = unlimited, > 0 = limited
+	IsSystemBigEndian bool
 
 	MediaPath string
 
@@ -188,7 +190,7 @@ var (
 	// =================================================================
 	// DicDTMFEvent
 
-	DicDTMFEvent = map[int]string{
+	DicDTMFEvent = map[byte]string{
 		0:  "DTMF 0",
 		1:  "DTMF 1",
 		2:  "DTMF 2",

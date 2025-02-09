@@ -17,7 +17,6 @@ package sip
 import (
 	"SRGo/cl"
 	. "SRGo/global"
-	"SRGo/sip/ivr"
 	"fmt"
 	"net"
 	"os"
@@ -28,7 +27,7 @@ var (
 	Sessions ConcurrentMapMutex
 )
 
-func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
+func StartServer(ipv4 string, sup, htp int) *net.UDPConn {
 	fmt.Print("Initializing Global Parameters...")
 	Sessions = NewConcurrentMapMutex()
 
@@ -73,17 +72,14 @@ func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
 	// 	fmt.Println("Selected:", serverIP)
 	// }
 
-	ivr.IVRsRepo = ivr.NewIVRs()
-
-	serverIP := net.ParseIP(ipv4)
+	MRFRepos = NewMRFRepoCollection()
 
 	fmt.Print("Attempting to listen on SIP...")
-	serverUDPListener, err := StartListening(serverIP, SipUdpPort)
+	serverUDPListener, err := StartListening(ServerIPv4, SipUdpPort)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(2)
 	}
-	ServerIPv4 = serverIP.String()
 	MediaPorts = NewMediaPortPool()
 
 	startWorkers(serverUDPListener)
@@ -94,7 +90,7 @@ func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
 	CallLimiter = cl.NewCallLimiter(RateLimit, Prometrics, &WtGrp)
 	fmt.Printf("OK (%d)\n", RateLimit)
 
-	return serverUDPListener, serverIP
+	return serverUDPListener
 }
 
 // =================================================================================================
@@ -102,7 +98,7 @@ func StartServer(ipv4 string, sup, htp int) (*net.UDPConn, net.IP) {
 
 var (
 	WorkerCount = runtime.NumCPU()
-	QueueSize   = 1000
+	QueueSize   = 500
 	packetQueue = make(chan Packet, QueueSize)
 )
 
@@ -170,7 +166,7 @@ func processPacket(packet Packet, conn *net.UDPConn) {
 		ss, newSesType := sessionGetter(msg)
 		if ss != nil {
 			ss.RemoteUDP = packet.sourceAddr
-			ss.UDPListenser = conn
+			ss.SIPUDPListenser = conn
 		}
 		sipStack(msg, ss, newSesType)
 		pdu = pdutmp

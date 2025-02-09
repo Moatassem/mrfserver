@@ -300,7 +300,7 @@ func (sipmsg *SipMessage) TranslateRM(ss *SipSession, tx *Transaction, nt numtyp
 	if NewNumber == "" {
 		return
 	}
-	localsocket := GenerateUDPSocket(ss.UDPListenser)
+	localsocket := GetUDPAddrFromConn(ss.SIPUDPListenser)
 	rep := fmt.Sprintf("${1}%s$2", NewNumber)
 
 	switch nt {

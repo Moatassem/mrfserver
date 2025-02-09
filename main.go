@@ -20,6 +20,7 @@ import (
 	"SRGo/sip"
 	"SRGo/webserver"
 	"fmt"
+	"net"
 	"os"
 )
 
@@ -38,9 +39,9 @@ func init() {
 func main() {
 	greeting()
 	global.Prometrics = prometheus.NewMetrics(global.B2BUAName)
-	conn, ip := sip.StartServer(checkArgs())
+	conn := sip.StartServer(checkArgs())
 	defer conn.Close() //close SIP server connection
-	webserver.StartWS(ip)
+	webserver.StartWS(global.ServerIPv4)
 	global.WtGrp.Wait()
 }
 
@@ -54,6 +55,7 @@ func checkArgs() (ipv4 string, sipuport, httpport int) {
 		fmt.Println("No self IPv4 address provided!")
 		os.Exit(1)
 	}
+	global.ServerIPv4 = net.ParseIP(ipv4)
 
 	sup := os.Getenv(Own_SIP_UdpPort)
 	sipuport, _ = global.Str2IntDefaultMinMax(sup, 5060, 4999, 6000)

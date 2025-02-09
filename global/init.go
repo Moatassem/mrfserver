@@ -15,6 +15,8 @@
 package global
 
 import (
+	"SRGo/rtp"
+	"encoding/binary"
 	"sync"
 )
 
@@ -22,6 +24,8 @@ func InitializeEngine() {
 	responsesHeadersInit()
 	BufferPool = newSyncPool(BufferSize)
 	MediaBufferPool = newSyncPool(MediaBufferSize)
+	IsSystemBigEndian = checkSystemIndian()
+	rtp.InitializeTX()
 }
 
 func newSyncPool(bsz int) *sync.Pool {
@@ -31,4 +35,11 @@ func newSyncPool(bsz int) *sync.Pool {
 			return &b
 		},
 	}
+}
+
+func checkSystemIndian() bool {
+	var i int32 = 0x01020304
+	buf := make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, uint32(i))
+	return i == int32(binary.BigEndian.Uint32(buf))
 }
