@@ -110,7 +110,7 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	var dtmfFormat *sdp.Format
 	for i := 0; i < len(sdpses.Media); i++ {
 		media = sdpses.Media[i]
-		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || conn == nil && len(media.Connection) == 0 || media.Mode != sdp.SendRecv {
+		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || conn == nil && len(media.Connection) == 0 { //|| media.Mode != sdp.SendRecv
 			continue
 		}
 		for j := 0; j < len(media.Connection); j++ {
@@ -177,8 +177,9 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	// need to handle INFO to play the required audio files
 	// need to handle DTMF
 	// TODO need to build RTP packets and stream media back
-	ss.LocalSocket = MediaPorts.ReserveSocket(ServerIPv4)
-
+	if ss.LocalSocket == nil {
+		ss.LocalSocket = MediaPorts.ReserveSocket(ServerIPv4)
+	}
 	if ss.LocalSocket == nil {
 		sipcode = status.NotAcceptableHere
 		q850code = q850.ResourceUnavailableUnspecified
@@ -189,8 +190,8 @@ func (ss *SipSession) BuildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	mySDP := &sdp.Session{
 		Origin: &sdp.Origin{
 			Username:       "mt",
-			SessionID:      int64(RandomNum(1000, 9000)),
-			SessionVersion: 1,
+			SessionID:      1, // will be updated by updateSDPPart in PrepareMessageBytes
+			SessionVersion: 1, // will be updated by updateSDPPart in PrepareMessageBytes
 			Network:        sdp.NetworkInternet,
 			Type:           sdp.TypeIPv4,
 			Address:        ServerIPv4,

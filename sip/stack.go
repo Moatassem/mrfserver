@@ -442,6 +442,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				sc, qc, wr := ss.BuildSDPAnswer(sipmsg)
 				if sc != 0 {
 					ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(sc, qc, wr), EmptyBody())
+					return
 				}
 				ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
 			} else {
