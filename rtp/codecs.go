@@ -83,9 +83,9 @@ func G711ToG722(input []byte, isALaw bool) ([]byte, error) {
 	pcm := make([]int16, len(input))
 	for i, b := range input {
 		if isALaw {
-			pcm[i] = ALawToPCM(b)
+			pcm[i] = alaw2PCM(b)
 		} else {
-			pcm[i] = MuLawToPCM(b)
+			pcm[i] = mulaw2PCM(b)
 		}
 	}
 
@@ -113,19 +113,33 @@ func G722ToG711(input []byte, isALaw bool) ([]byte, error) {
 	}
 
 	// Encode PCM to G.711
-	output := make([]byte, len(pcm))
-	for i, sample := range pcm {
-		if isALaw {
-			output[i] = PCMToALaw(sample)
-		} else {
-			output[i] = PCMToMuLaw(sample)
-		}
+	var output []byte
+	if isALaw {
+		output = PCM2G711A(pcm)
+	} else {
+		output = PCM2G711U(pcm)
 	}
 	return output, nil
 }
 
-// PCMToALaw converts PCM to G.711 A-law
-func PCMToALaw(sample int16) byte {
+func PCM2G711A(pcmBytes []int16) []byte {
+	output := make([]byte, len(pcmBytes))
+	for i, sample := range pcmBytes {
+		output[i] = pcm2ALaw(sample)
+	}
+	return output
+}
+
+func PCM2G711U(pcmBytes []int16) []byte {
+	output := make([]byte, len(pcmBytes))
+	for i, sample := range pcmBytes {
+		output[i] = pcm2MuLaw(sample)
+	}
+	return output
+}
+
+// pcm2ALaw converts PCM to G.711 A-law
+func pcm2ALaw(sample int16) byte {
 	// Handle the sign
 	var sign byte
 	if sample < 0 {
@@ -162,8 +176,8 @@ func PCMToALaw(sample int16) byte {
 	return alaw
 }
 
-// PCMToMuLaw converts PCM to G.711 mu-law
-func PCMToMuLaw(sample int16) byte {
+// pcm2MuLaw converts PCM to G.711 mu-law
+func pcm2MuLaw(sample int16) byte {
 	// Handle the sign
 	var sign byte
 	if sample < 0 {
@@ -203,8 +217,8 @@ func PCMToMuLaw(sample int16) byte {
 	return ulaw
 }
 
-// ALawToPCM converts G.711 A-law to PCM
-func ALawToPCM(b byte) int16 {
+// alaw2PCM converts G.711 A-law to PCM
+func alaw2PCM(b byte) int16 {
 	// XOR with 0x55 to invert every other bit
 	b ^= 0x55
 
@@ -229,8 +243,8 @@ func ALawToPCM(b byte) int16 {
 	return pcm
 }
 
-// MuLawToPCM converts G.711 mu-law to PCM
-func MuLawToPCM(b byte) int16 {
+// mulaw2PCM converts G.711 mu-law to PCM
+func mulaw2PCM(b byte) int16 {
 	// XOR with 0xFF to invert all bits
 	b ^= 0xFF
 

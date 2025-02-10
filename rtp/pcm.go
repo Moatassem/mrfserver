@@ -83,58 +83,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
 	"os"
-
-	"github.com/hajimehoshi/go-mp3"
 )
 
-func Mp3ToPcm(filename string) ([]int16, error) {
+func RawToPcm(filename string) ([]int16, error) {
 	file, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return nil, err
 	}
 	pcmData := bytesToInt16(file)
-	// Output PCM sample count
-	fmt.Println("PCM Data Length:", len(pcmData))
-	return pcmData, nil
-}
-
-func Mp3ToPcm1(filename string) ([]int16, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Println("Error opening file:", err)
-		return nil, err
-	}
-	defer file.Close()
-
-	// Decode the MP3 file
-	decoder, err := mp3.NewDecoder(file)
-	if err != nil {
-		fmt.Println("Error decoding MP3:", err)
-		return nil, err
-	}
-
-	// Read PCM data from decoder
-	var pcmData []int16
-	buf := make([]byte, 5_000_000) // Buffer for reading bytes
-
-	for {
-		n, err := decoder.Read(buf)
-		if err != nil && err != io.EOF {
-			fmt.Println("Error reading MP3:", err)
-			return nil, err
-		}
-		if n == 0 {
-			break
-		}
-
-		// Convert bytes to int16 PCM samples
-		int16Samples := bytesToInt16(buf[:n])
-		pcmData = append(pcmData, int16Samples...)
-	}
-
 	// Output PCM sample count
 	fmt.Println("PCM Data Length:", len(pcmData))
 	return pcmData, nil

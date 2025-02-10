@@ -5,7 +5,8 @@ import (
 	"SRGo/rtp"
 	"fmt"
 	"os"
-	"path"
+	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -15,7 +16,7 @@ var MRFRepos *MRFRepoCollection
 
 type MRFRepoCollection struct {
 	mu   sync.RWMutex
-	maps *map[string]map[string]*[]byte
+	maps *map[string]map[string]*[]int16
 }
 
 func NewMRFRepoCollection() *MRFRepoCollection {
@@ -24,9 +25,17 @@ func NewMRFRepoCollection() *MRFRepoCollection {
 	return &ivrs
 }
 
-func loadMedia() *map[string]map[string]*[]byte {
-	mp := make(map[string]map[string]*[]byte)
-	mp[UPart] = make(map[string]*[]byte)
+func dropExtension(fn string) string {
+	idx := strings.LastIndex(fn, ".")
+	if idx == -1 {
+		return fn
+	}
+	return fn[:idx]
+}
+
+func loadMedia() *map[string]map[string]*[]int16 {
+	mp := make(map[string]map[string]*[]int16)
+	mp[UPart] = make(map[string]*[]int16)
 
 	dentries, err := os.ReadDir(global.MediaPath)
 	if err != nil {
@@ -36,15 +45,10 @@ func loadMedia() *map[string]map[string]*[]byte {
 		if dentry.IsDir() {
 			continue
 		}
-		fullpath := path.Join(global.MediaPath, dentry.Name())
+		fullpath := filepath.Join(global.MediaPath, dentry.Name())
 		fmt.Println(fullpath)
-		// audioBytes, err := os.ReadFile(fullpath)
-		// if err != nil {
-		// 	fmt.Printf("Error reading file %s: %v", fullpath, err)
-		// 	continue
-		// }
 
-		pcmBytes, err := rtp.Mp3ToPcm(fullpath)
+		pcmBytes, err := rtp.RawToPcm(fullpath)
 		if err != nil {
 			continue
 		}
@@ -60,7 +64,7 @@ func loadMedia() *map[string]map[string]*[]byte {
 		// 		output[i] = rtp.PCMToMuLaw(sample)
 		// 	}
 		// }
-		output := rtp.PCM2G722(pcmBytes)
+		// output := rtp.PCM2G722(pcmBytes)
 
 		// // Decode MP3 to PCM
 		// decoder, err := mp3.NewDecoder(bytes.NewReader(audioBytes))
@@ -74,7 +78,7 @@ func loadMedia() *map[string]map[string]*[]byte {
 		// if err != nil {
 		// 	panic(err)
 		// }
-		mp[UPart][dentry.Name()] = &output
+		mp[UPart][dropExtension(dentry.Name())] = &pcmBytes
 	}
 
 	return &mp
@@ -85,7 +89,7 @@ func (mrfr *MRFRepoCollection) DoesMRFRepoExist(upart string) bool {
 	return ok
 }
 
-func (mrfr *MRFRepoCollection) Get(upart, key string) (*[]byte, bool) {
+func (mrfr *MRFRepoCollection) Get(upart, key string) (*[]int16, bool) {
 	mrfr.mu.RLock()
 	defer mrfr.mu.RUnlock()
 	if mp, ok := (*mrfr.maps)[upart]; ok {
@@ -95,7 +99,7 @@ func (mrfr *MRFRepoCollection) Get(upart, key string) (*[]byte, bool) {
 	return nil, false
 }
 
-func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes *[]byte) {
+func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes *[]int16) {
 	mrfr.mu.Lock()
 	defer mrfr.mu.Unlock()
 	(*mrfr.maps)[upart][key] = bytes

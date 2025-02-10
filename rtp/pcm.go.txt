@@ -1,0 +1,68 @@
+package rtp
+
+import (
+	"bytes"
+	"encoding/binary"
+	"errors"
+	"io"
+	"os"
+
+	"github.com/hajimehoshi/go-mp3"
+)
+
+// ReadWAV extracts raw PCM int16 samples from a WAV file
+func ReadWAV(filename string) ([]int16, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var header [44]byte
+	if _, err := io.ReadFull(file, header[:]); err != nil {
+		return nil, err
+	}
+
+	var data []int16
+	for {
+		var sample int16
+		if err := binary.Read(file, binary.LittleEndian, &sample); err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return nil, err
+		}
+		data = append(data, sample)
+	}
+	return data, nil
+}
+
+// ReadMP3 extracts raw PCM int16 samples from an MP3 file
+func ReadMP3(filename string) ([]int16, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	decoder, err := mp3.NewDecoder(file)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := new(bytes.Buffer)
+	if _, err := io.Copy(buf, decoder); err != nil {
+		return nil, err
+	}
+
+	pcmData := buf.Bytes()
+	var samples []int16
+	for i := 0; i < len(pcmData); i += 2 {
+		if i+1 >= len(pcmData) {
+			break
+		}
+		val := int16(pcmData[i]) | int16(pcmData[i+1])<<8
+		samples = append(samples, val)
+	}
+	return samples, nil
+}

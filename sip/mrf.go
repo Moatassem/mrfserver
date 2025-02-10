@@ -17,6 +17,7 @@ package sip
 import (
 	. "SRGo/global"
 	"SRGo/q850"
+	"SRGo/rtp"
 	"SRGo/sdp"
 	"SRGo/sip/state"
 	"SRGo/sip/status"
@@ -256,44 +257,66 @@ func (ss *SipSession) mediaReceiver() {
 			fmt.Println("Received RTP from unknown remote connection")
 			continue
 		}
-		if n == 16 {
+		if n == 16 { // TODO check if no RFC 4733 is negotiated - transcode InBand DTMF into teleEvents
 			ts := binary.BigEndian.Uint32(bytes[4:8]) //TODO check how to use IsSystemBigEndian
 			if ss.rtpRFC4733TS != ts {
 				dtmf := DicDTMFEvent[bytes[12]]
 				fmt.Printf("RFC 4733 Received: %s\n", dtmf)
+				if dtmf == "DTMF #" { // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
+					ss.stopRTPStreaming()
+				}
 				ss.rtpRFC4733TS = ts
 			}
 		}
 	}
 }
 
+func (ss *SipSession) stopRTPStreaming() {
+	ss.rtpmutex.RLock()
+	if !ss.isrtpstreaming {
+		ss.rtpmutex.RUnlock()
+		return
+	}
+	ss.rtpmutex.RUnlock()
+
+	ss.rtpChan <- true
+}
+
 func (ss *SipSession) startRTPStreaming() {
+	ss.rtpmutex.Lock()
+	if ss.isrtpstreaming {
+		ss.rtpmutex.Unlock()
+		return
+	}
+	ss.isrtpstreaming = true
+	ss.rtpmutex.Unlock()
+
+	// filename := "Ba3dSeneen"
+	// filename := "MayserreemRingTone"
+	filename := "ErsemAlb"
+	pcm, ok := MRFRepos.Get("999", filename)
+	data := rtp.PCM2G722(*pcm) // TODO transcode for the selected ss.rtpPayload
+	if !ok {
+		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
+		return
+	}
+
 	tckr := time.NewTicker(20 * time.Millisecond)
-	defer func() {
-		tckr.Stop()
-		ss.isrtpstreaming = false
-	}()
+	defer tckr.Stop()
 
 	Marker := true
 	// ss.rtpIndex = 0 // TODO put it zero if file change
 	audiopayloadsize := 160
 
-	// filename := "Ba3dSeneen.raw"
-	filename := "MayserreemRingTone.raw"
-	data, ok := MRFRepos.Get("999", filename)
-	if !ok {
-		fmt.Printf("Cannot find file [%s]\n", filename)
-		return
-	}
-	ss.isrtpstreaming = true
+rtploop:
 	for {
 		select {
 		case <-ss.rtpChan:
-			return
+			break rtploop
 		case <-tckr.C:
 		}
 		if ss.IsCallHeld {
-			return
+			break rtploop
 		}
 		ss.rtpTimeStmp += uint32(audiopayloadsize)
 		// buf := MediaBufferPool.Get().(*[]byte)
@@ -306,13 +329,13 @@ func (ss *SipSession) startRTPStreaming() {
 			ss.rtpSequenceNum = 0
 		}
 
-		delta := len(*data) - ss.rtpIndex
+		delta := len(data) - ss.rtpIndex
 		var payload []byte
 		if audiopayloadsize <= delta {
-			payload = (*data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
+			payload = (data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
 			ss.rtpIndex += audiopayloadsize
 		} else {
-			payload = (*data)[ss.rtpIndex : ss.rtpIndex+delta]
+			payload = (data)[ss.rtpIndex : ss.rtpIndex+delta]
 			for n := delta; n < audiopayloadsize; n++ {
 				payload = append(payload, 251)
 			}
@@ -330,6 +353,10 @@ func (ss *SipSession) startRTPStreaming() {
 		ss.rtpSequenceNum++
 		Marker = false
 	}
+
+	ss.rtpmutex.Lock()
+	ss.isrtpstreaming = false
+	ss.rtpmutex.Unlock()
 }
 
 func bool2byte(b bool) byte {
@@ -349,10 +376,6 @@ func uint32ToBytes(num uint32) []byte {
 	bytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(bytes, num)
 	return bytes
-}
-
-func (ss *SipSession) stopRTPStreaming() {
-	ss.rtpChan <- true
 }
 
 // ============================================================================
