@@ -86,6 +86,8 @@ import (
 	"os"
 )
 
+// TODO read about adding sox wrapper
+
 func RawToPcm(filename string) ([]int16, error) {
 	file, err := os.ReadFile(filename)
 	if err != nil {
