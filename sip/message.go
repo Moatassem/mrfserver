@@ -347,6 +347,7 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 	var bb bytes.Buffer
 	var headers []string
 
+	// TODO .. i can drop this part since I've already the *sdp.Session .. to avoid []byte >> string >> []byte
 	updateSDPPart := func(sipmsg *SipMessage, ss *SipSession) {
 		ct, ok := sipmsg.Body.PartsContents[SDP]
 		if !ok {
