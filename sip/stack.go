@@ -464,8 +464,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)
-					// TODO update connection to the new codec streaming
-					// ss.stopRTPStreaming()
+					// TODO update streaming if codec has changed
 					go ss.startRTPStreaming()
 				}
 			}

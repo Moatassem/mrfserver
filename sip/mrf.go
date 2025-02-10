@@ -298,62 +298,64 @@ func (ss *SipSession) startRTPStreaming() {
 	data := rtp.PCM2G722(*pcm) // TODO transcode for the selected ss.rtpPayload
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
-		return
+		goto finish
 	}
 
-	tckr := time.NewTicker(20 * time.Millisecond)
-	defer tckr.Stop()
+	{
+		tckr := time.NewTicker(20 * time.Millisecond)
+		defer tckr.Stop()
 
-	Marker := true
-	// ss.rtpIndex = 0 // TODO put it zero if file change
-	audiopayloadsize := 160
+		Marker := true
+		// ss.rtpIndex = 0 // TODO put it zero if file change
+		audiopayloadsize := 160
 
-rtploop:
-	for {
-		select {
-		case <-ss.rtpChan:
-			break rtploop
-		case <-tckr.C:
-		}
-		if ss.IsCallHeld {
-			break rtploop
-		}
-		ss.rtpTimeStmp += uint32(audiopayloadsize)
-		// buf := MediaBufferPool.Get().(*[]byte)
-		// pkt := (*buf)[:172]
-		// MediaBufferPool.Put(buf)
-
-		pkt := make([]byte, 0, audiopayloadsize+12)
-
-		if ss.rtpSequenceNum == math.MaxUint16 {
-			ss.rtpSequenceNum = 0
-		}
-
-		delta := len(data) - ss.rtpIndex
-		var payload []byte
-		if audiopayloadsize <= delta {
-			payload = (data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
-			ss.rtpIndex += audiopayloadsize
-		} else {
-			payload = (data)[ss.rtpIndex : ss.rtpIndex+delta]
-			for n := delta; n < audiopayloadsize; n++ {
-				payload = append(payload, 251)
+		for {
+			select {
+			case <-ss.rtpChan:
+				goto finish
+			case <-tckr.C:
 			}
-			ss.rtpIndex += delta
+			if ss.IsCallHeld {
+				goto finish
+			}
+			ss.rtpTimeStmp += uint32(audiopayloadsize)
+			// buf := MediaBufferPool.Get().(*[]byte)
+			// pkt := (*buf)[:172]
+			// MediaBufferPool.Put(buf)
+
+			pkt := make([]byte, 0, audiopayloadsize+12)
+
+			if ss.rtpSequenceNum == math.MaxUint16 {
+				ss.rtpSequenceNum = 0
+			}
+
+			delta := len(data) - ss.rtpIndex
+			var payload []byte
+			if audiopayloadsize <= delta {
+				payload = (data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
+				ss.rtpIndex += audiopayloadsize
+			} else {
+				payload = (data)[ss.rtpIndex : ss.rtpIndex+delta]
+				for n := delta; n < audiopayloadsize; n++ {
+					payload = append(payload, 251)
+				}
+				ss.rtpIndex += delta
+			}
+
+			pkt = append(pkt, 128)
+			pkt = append(pkt, bool2byte(Marker)*128+ss.rtpPayload)
+			pkt = append(pkt, uint16ToBytes(ss.rtpSequenceNum)...)
+			pkt = append(pkt, uint32ToBytes(ss.rtpTimeStmp)...)
+			pkt = append(pkt, uint32ToBytes(ss.rtpSSRC)...)
+			pkt = append(pkt, payload...)
+
+			ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
+			ss.rtpSequenceNum++
+			Marker = false
 		}
-
-		pkt = append(pkt, 128)
-		pkt = append(pkt, bool2byte(Marker)*128+ss.rtpPayload)
-		pkt = append(pkt, uint16ToBytes(ss.rtpSequenceNum)...)
-		pkt = append(pkt, uint32ToBytes(ss.rtpTimeStmp)...)
-		pkt = append(pkt, uint32ToBytes(ss.rtpSSRC)...)
-		pkt = append(pkt, payload...)
-
-		ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
-		ss.rtpSequenceNum++
-		Marker = false
 	}
 
+finish:
 	ss.rtpmutex.Lock()
 	ss.isrtpstreaming = false
 	ss.rtpmutex.Unlock()
