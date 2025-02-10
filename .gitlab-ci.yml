@@ -1,20 +1,20 @@
 include:
-    - component: $CI_SERVER_FQDN/to-be-continuous/docker/gitlab-ci-docker@6.1.0
-      inputs:
-            build-tool: kaniko
-            registry-mirror: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE"
-            snapshot-image: $CI_REGISTRY_IMAGE/srgo:$CI_COMMIT_REF_SLUG
-            release-image: $CI_REGISTRY_IMAGE/release/srgo:$CI_COMMIT_REF_NAME
-            release-extra-tags-pattern: "^((?P<major>[0-9]+)\\.(?P<minor>[0-9]+)\\.(?P<patch>[0-9]+))$"
-            release-extra-tags: latest
-            hadolint-args: "--failure-threshold error"
-    - component: $CI_SERVER_FQDN/to-be-continuous/golang/gitlab-ci-golang@4.11.1
-    - project: 'to-be-continuous/gitleaks'
-      ref: '2.6.1'
-      file: '/templates/gitlab-ci-gitleaks.yml'
+  - component: $CI_SERVER_FQDN/to-be-continuous/docker/gitlab-ci-docker@6.1.0
+    inputs:
+      build-tool: kaniko
+      registry-mirror: "$CI_REGISTRY/$CI_PROJECT_NAMESPACE"
+      snapshot-image: $CI_REGISTRY_IMAGE/mrfgo:$CI_COMMIT_REF_SLUG
+      release-image: $CI_REGISTRY_IMAGE/release/mrfgo:$CI_COMMIT_REF_NAME
+      release-extra-tags-pattern: "^((?P<major>[0-9]+)\\.(?P<minor>[0-9]+)\\.(?P<patch>[0-9]+))$"
+      release-extra-tags: latest
+      hadolint-args: "--failure-threshold error"
+  - component: $CI_SERVER_FQDN/to-be-continuous/golang/gitlab-ci-golang@4.11.1
+  - project: "to-be-continuous/gitleaks"
+    ref: "2.6.1"
+    file: "/templates/gitlab-ci-gitleaks.yml"
 
 gitleaks:
-  allow_failure: true    
+  allow_failure: true
   retry: 2
 
 docker-trivy:

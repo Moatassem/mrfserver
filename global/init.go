@@ -1,5 +1,5 @@
 /*
-# Software Name : Session Router (SR)
+# Software Name : Media Resource Function Server (SR)
 # SPDX-FileCopyrightText: Copyright (c) Orange Business - OINIS/Services/NSF
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -15,7 +15,7 @@
 package global
 
 import (
-	"SRGo/rtp"
+	"MRFGo/rtp"
 	"encoding/binary"
 	"sync"
 )

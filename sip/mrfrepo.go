@@ -1,8 +1,8 @@
 package sip
 
 import (
-	"SRGo/global"
-	"SRGo/rtp"
+	"MRFGo/global"
+	"MRFGo/rtp"
 	"fmt"
 	"os"
 	"path/filepath"

@@ -1,5 +1,5 @@
 /*
-# Software Name : Session Router (SR)
+# Software Name : Media Resource Function Server (SR)
 # SPDX-FileCopyrightText: Copyright (c) Orange Business - OINIS/Services/NSF
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -15,10 +15,10 @@
 package main
 
 import (
-	"SRGo/global"
-	"SRGo/prometheus"
-	"SRGo/sip"
-	"SRGo/webserver"
+	"MRFGo/global"
+	"MRFGo/prometheus"
+	"MRFGo/sip"
+	"MRFGo/webserver"
 	"fmt"
 	"net"
 	"os"

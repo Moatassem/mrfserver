@@ -1,4 +1,4 @@
-module SRGo
+module MRFGo
 
 go 1.23.6
 

@@ -1,5 +1,5 @@
 /*
-# Software Name : Session Router (SR)
+# Software Name : Media Resource Function Server (SR)
 # SPDX-FileCopyrightText: Copyright (c) Orange Business - OINIS/Services/NSF
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -15,8 +15,8 @@
 package global
 
 import (
-	"SRGo/cl"
-	"SRGo/prometheus"
+	"MRFGo/cl"
+	"MRFGo/prometheus"
 	"net"
 	"regexp"
 	"sync"
@@ -24,7 +24,7 @@ import (
 
 const (
 	EntityName = "OINIS-NSF"
-	B2BUAName  = "SRGo/1.2"
+	B2BUAName  = "MRFGo/1.0"
 
 	BufferSize int = 4096
 
