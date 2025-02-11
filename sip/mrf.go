@@ -247,7 +247,6 @@ func (ss *SipSession) mediaReceiver() {
 				_ = opErr
 				return
 			}
-			// if errors.Is(err, *net.OpError)
 			fmt.Println(err)
 			continue
 		}
@@ -299,15 +298,15 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 	ss.isrtpstreaming = true
 	ss.rtpmutex.Unlock()
 
-	// filename := "Ba3dSeneen"
-	// filename := "MayserreemRingTone"
-	// filename := "ErsemAlb"
 	pcm, ok := MRFRepos.Get("999", filename) // TODO build repos and manage them from UI
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
 		goto finish1
 	}
 
+	// TODO get SIP Engine PCM2G711A & PCM2G711U
+
+	// TODO only allow ptime:20 .. i.e. 160 bytes/packet/20ms
 	{
 		data, silence := rtp.TxPCMnSilence(*pcm, ss.rtpPayload)
 		if data == nil {
