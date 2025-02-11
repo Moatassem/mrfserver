@@ -1,6 +1,6 @@
-# Media Resource Function (MRF) Server v1.2 - written from scratch in Golang
+# Media Resource Function (MRF) Server v1.0 - written from scratch in Golang
 
-- Highly optimized, high performance, modular, carrier-grade MRF with capacity **exceeding 1000 CAPS** and **25,000 concurrent sessions**
+- Highly optimized, high performance, modular, carrier-grade MRF with capacity **exceeding 1000 CAPS** and **50,000 concurrent sessions**
 - Highly customizable MRF supporting Media Server Control
 - Docker-containerized compiled with golang:alpine
 
@@ -17,7 +17,7 @@ Notes below ports are exposed **by default**:
 
 ## Routing Logic
 
-- MRF has pools of directory number and associated audio files
+- MRFGo has pools of directory number and associated audio files
 - MRFGo supports PCMA, PCMU, G722 ... soon G729 and OPUS
 
 ## Environment Variables

@@ -17,7 +17,7 @@ type MediaPool struct {
 	used  []int
 }
 
-const checkUsedUDPPortIntervalSec int = 10
+const checkUsedUDPPortIntervalSec int = 60
 
 func NewMediaPortPool() *MediaPool {
 	mpp := &MediaPool{alloc: make(map[int]bool, global.MediaEndPort-global.MediaStartPort+1)}
