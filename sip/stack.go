@@ -460,12 +460,12 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.StartMaxCallDuration()
 				ss.StartInDialogueProbing()
 				go ss.mediaReceiver()
-				go ss.startRTPStreaming("ErsemAlb")
+				go ss.startRTPStreaming("RaafatAlHagganIntro")
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)
 					// TODO update streaming if codec has changed
-					go ss.startRTPStreaming("ErsemAlb")
+					go ss.startRTPStreaming("RaafatAlHagganIntro")
 				}
 			}
 		case CANCEL:

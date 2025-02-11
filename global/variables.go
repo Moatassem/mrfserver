@@ -31,7 +31,7 @@ const (
 	RTPHeaderSize  int = 12
 	RTPPayloadSize int = 160
 	MediaStartPort int = 6000
-	MediaEndPort   int = 20000
+	MediaEndPort   int = 6000 //20000
 
 	T1Timer              int    = 500
 	ReTXCount            int    = 5

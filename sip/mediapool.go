@@ -2,9 +2,11 @@ package sip
 
 import (
 	"MRFGo/global"
+	"fmt"
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 var MediaPorts *MediaPool
@@ -12,14 +14,49 @@ var MediaPorts *MediaPool
 type MediaPool struct {
 	mu    sync.Mutex
 	alloc map[int]bool
+	used  []int
 }
 
+const checkUsedUDPPortIntervalSec int = 10
+
 func NewMediaPortPool() *MediaPool {
-	mp := &MediaPool{alloc: make(map[int]bool, global.MediaEndPort-global.MediaStartPort+1)}
+	mpp := &MediaPool{alloc: make(map[int]bool, global.MediaEndPort-global.MediaStartPort+1)}
 	for port := global.MediaStartPort; port <= global.MediaEndPort; port++ {
-		mp.alloc[port] = false
+		mpp.alloc[port] = false
 	}
-	return mp
+	go mpp.checkUsedPorts()
+	return mpp
+}
+
+func (mpp *MediaPool) checkUsedPorts() {
+	tmr := time.NewTicker(time.Duration(checkUsedUDPPortIntervalSec) * time.Second)
+	defer tmr.Stop()
+	for {
+		<-tmr.C
+		i := 0
+		mpp.mu.Lock()
+		for {
+			if i >= len(mpp.used) {
+				break
+			}
+			port := mpp.used[i]
+			addr := fmt.Sprintf("%s:%d", global.ServerIPv4, port)
+			conn, err := net.ListenPacket("udp", addr)
+			if err != nil {
+				i++
+				continue
+			}
+			conn.Close()
+			mpp.alloc[port] = false
+			mpp.used = removeAt(mpp.used, i)
+		}
+		mpp.mu.Unlock()
+	}
+}
+
+func removeAt(slice []int, i int) []int {
+	slice[i] = slice[len(slice)-1] // Move last element to index i
+	return slice[:len(slice)-1]    // Trim the last element
 }
 
 func (mpp *MediaPool) ReserveSocket() *net.UDPConn {
@@ -30,6 +67,7 @@ func (mpp *MediaPool) ReserveSocket() *net.UDPConn {
 			socket, err := global.StartListening(global.ServerIPv4, port)
 			mpp.alloc[port] = true
 			if err != nil {
+				mpp.used = append(mpp.used, port)
 				continue
 			}
 			return socket

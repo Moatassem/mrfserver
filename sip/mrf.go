@@ -303,13 +303,14 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 	// filename := "MayserreemRingTone"
 	// filename := "ErsemAlb"
 	pcm, ok := MRFRepos.Get("999", filename) // TODO build repos and manage them from UI
-	data := rtp.PCM2G722(*pcm)               // TODO transcode for the selected ss.rtpPayload
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
 		goto finish1
 	}
 
 	{
+		data := rtp.PCM2G722(*pcm) // TODO transcode for the selected ss.rtpPayload
+
 		tckr := time.NewTicker(20 * time.Millisecond)
 		defer tckr.Stop()
 

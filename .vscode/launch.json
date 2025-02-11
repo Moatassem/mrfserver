@@ -13,8 +13,8 @@
         "server_ipv4": "192.168.1.2",
         "sip_udp_port": "5060",
         "http_port": "8080",
-        "media_path": "D:\\Downloads\\Varieties\\Songs"
-        // server_ipv4=192.168.1.2 sip_udp_port=5060 http_port=8080 media_path=D:\\Downloads\\Varieties\\Songs go run . -race
+        "media_path": ".\\audio"
+        // server_ipv4=192.168.1.2 sip_udp_port=5060 http_port=8080 media_path=.\\audio go run . -race
       }
     }
   ]
