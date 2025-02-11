@@ -9,6 +9,14 @@ import (
 	// "github.com/xlab/opus-go/opus"
 )
 
+const (
+	PCMU byte = 0
+	PCMA byte = 8
+	G722 byte = 9
+)
+
+var codecSilence = map[byte]byte{PCMU: 255, PCMA: 213, G722: 85}
+
 // G.711 A-law to mu-law conversion table
 var a2u = [256]byte{
 	0x80, 0x80, 0x81, 0x82, 0x83, 0x84, 0x85, 0x86, 0x87, 0x88, 0x89, 0x8A, 0x8B, 0x8C, 0x8D, 0x8E,
@@ -93,16 +101,6 @@ func G711ToG722(input []byte, isALaw bool) ([]byte, error) {
 	return PCM2G722(pcm), nil
 }
 
-func PCM2G722(pcm []int16) []byte {
-	g722 := make([]byte, len(pcm))
-	n := TranscodingEngine.G722Encoder.Encode(g722, pcm)
-	if n == 0 {
-		fmt.Println(fmt.Errorf("Failed to encode G.722 data"))
-		return nil
-	}
-	return g722
-}
-
 // G722ToG711 transcodes G.722 to G.711 (A-law or mu-law)
 func G722ToG711(input []byte, isALaw bool) ([]byte, error) {
 	// Decode G.722 to PCM
@@ -120,6 +118,29 @@ func G722ToG711(input []byte, isALaw bool) ([]byte, error) {
 		output = PCM2G711U(pcm)
 	}
 	return output, nil
+}
+
+func TxPCMnSilence(pcm []int16, pt byte) ([]byte, byte) {
+	switch pt {
+	case PCMU:
+		return PCM2G711U(pcm), codecSilence[pt]
+	case PCMA:
+		return PCM2G711A(pcm), codecSilence[pt]
+	case G722:
+		return PCM2G722(pcm), codecSilence[pt]
+	default:
+		return nil, 0
+	}
+}
+
+func PCM2G722(pcm []int16) []byte {
+	g722 := make([]byte, len(pcm))
+	n := TranscodingEngine.G722Encoder.Encode(g722, pcm)
+	if n == 0 {
+		fmt.Println(fmt.Errorf("Failed to encode G.722 data"))
+		return nil
+	}
+	return g722
 }
 
 func PCM2G711A(pcmBytes []int16) []byte {

@@ -309,7 +309,10 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 	}
 
 	{
-		data := rtp.PCM2G722(*pcm) // TODO transcode for the selected ss.rtpPayload
+		data, silence := rtp.TxPCMnSilence(*pcm, ss.rtpPayload)
+		if data == nil {
+			goto finish1
+		}
 
 		tckr := time.NewTicker(20 * time.Millisecond)
 		defer tckr.Stop()
@@ -345,7 +348,7 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 			} else {
 				payload = (data)[ss.rtpIndex : ss.rtpIndex+delta]
 				for n := delta; n < RTPPayloadSize; n++ {
-					payload = append(payload, 251)
+					payload = append(payload, silence)
 				}
 				ss.rtpIndex += delta
 			}
