@@ -237,8 +237,8 @@ func (ss *SipSession) mediaReceiver() {
 		if ss.MediaListener == nil {
 			return
 		}
-		buf := RTPRXBufferPool.Get().(*[]byte)
-		n, addr, err := ss.MediaListener.ReadFromUDP(*buf)
+		buf := RTPRXBufferPool.Get().([]byte)
+		n, addr, err := ss.MediaListener.ReadFromUDP(buf)
 		if err != nil {
 			if buf != nil {
 				RTPRXBufferPool.Put(buf)
@@ -251,7 +251,7 @@ func (ss *SipSession) mediaReceiver() {
 			fmt.Println(err)
 			continue
 		}
-		bytes := (*buf)[:n]
+		bytes := buf[:n]
 		RTPRXBufferPool.Put(buf)
 		if !AreUAddrsEqual(addr, ss.RemoteMedia) {
 			fmt.Println("Received RTP from unknown remote connection")
@@ -262,9 +262,13 @@ func (ss *SipSession) mediaReceiver() {
 			if ss.rtpRFC4733TS != ts {
 				dtmf := DicDTMFEvent[bytes[12]]
 				fmt.Printf("RFC 4733 Received: %s\n", dtmf)
-				if dtmf == "DTMF #" { // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
-					ss.stopRTPStreaming()
+				switch dtmf {
+				case "DTMF #":
+					ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
+				case "DTMF *":
+
 				}
+
 				ss.rtpRFC4733TS = ts
 			}
 		}
@@ -279,7 +283,11 @@ func (ss *SipSession) stopRTPStreaming() {
 	}
 	ss.rtpmutex.Unlock()
 
-	ss.rtpChan <- true
+	select {
+	case ss.rtpChan <- true:
+	default:
+		<-ss.rtpChan
+	}
 }
 
 func (ss *SipSession) startRTPStreaming(filename string) {
@@ -298,7 +306,7 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 	data := rtp.PCM2G722(*pcm)               // TODO transcode for the selected ss.rtpPayload
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
-		goto finish
+		goto finish1
 	}
 
 	{
@@ -311,12 +319,12 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 		for {
 			select {
 			case <-ss.rtpChan:
-				goto finish
+				goto finish2
 			case <-tckr.C:
 			}
 
 			if ss.IsCallHeld {
-				goto finish
+				goto finish1
 			}
 
 			ss.rtpTimeStmp += uint32(RTPPayloadSize)
@@ -355,7 +363,13 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 		}
 	}
 
-finish:
+finish1:
+	select {
+	case <-ss.rtpChan:
+	default:
+	}
+
+finish2:
 	ss.rtpmutex.Lock()
 	ss.isrtpstreaming = false
 	ss.rtpmutex.Unlock()

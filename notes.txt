@@ -1,0 +1,1 @@
+sox --clobber --no-glob "D:\Downloads\Varieties\Songs\ErsemAlb.wav" -e signed-integer -b 16 -c 1 -r 16000 "ErsemAlb.raw" speed 2
