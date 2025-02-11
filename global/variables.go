@@ -28,9 +28,10 @@ const (
 
 	BufferSize int = 4096
 
-	MediaBufferSize int = 200
-	MediaStartPort  int = 6000
-	MediaEndPort    int = 20000
+	RTPHeaderSize  int = 12
+	RTPPayloadSize int = 160
+	MediaStartPort int = 6000
+	MediaEndPort   int = 20000
 
 	T1Timer              int    = 500
 	ReTXCount            int    = 5
@@ -55,10 +56,12 @@ var (
 	MediaPath string
 
 	BufferPool      *sync.Pool
-	MediaBufferPool *sync.Pool
-	Prometrics      *prometheus.Metrics
-	CallLimiter     *cl.CallLimiter
-	WtGrp           sync.WaitGroup
+	RTPRXBufferPool *sync.Pool
+	RTPTXBufferPool *sync.Pool
+
+	Prometrics  *prometheus.Metrics
+	CallLimiter *cl.CallLimiter
+	WtGrp       sync.WaitGroup
 )
 
 var (

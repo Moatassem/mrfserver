@@ -75,7 +75,7 @@ type SipSession struct {
 	rtpSSRC        uint32
 	rtpIndex       int
 	rtpPayload     uint8
-	rtpmutex       sync.RWMutex
+	rtpmutex       sync.Mutex
 	isrtpstreaming bool
 
 	FwdCSeq uint32

@@ -237,11 +237,11 @@ func (ss *SipSession) mediaReceiver() {
 		if ss.MediaListener == nil {
 			return
 		}
-		buf := MediaBufferPool.Get().(*[]byte)
+		buf := RTPRXBufferPool.Get().(*[]byte)
 		n, addr, err := ss.MediaListener.ReadFromUDP(*buf)
 		if err != nil {
 			if buf != nil {
-				MediaBufferPool.Put(buf)
+				RTPRXBufferPool.Put(buf)
 			}
 			if opErr, ok := err.(*net.OpError); ok {
 				_ = opErr
@@ -252,7 +252,7 @@ func (ss *SipSession) mediaReceiver() {
 			continue
 		}
 		bytes := (*buf)[:n]
-		MediaBufferPool.Put(buf)
+		RTPRXBufferPool.Put(buf)
 		if !AreUAddrsEqual(addr, ss.RemoteMedia) {
 			fmt.Println("Received RTP from unknown remote connection")
 			continue
@@ -272,17 +272,17 @@ func (ss *SipSession) mediaReceiver() {
 }
 
 func (ss *SipSession) stopRTPStreaming() {
-	ss.rtpmutex.RLock()
+	ss.rtpmutex.Lock()
 	if !ss.isrtpstreaming {
-		ss.rtpmutex.RUnlock()
+		ss.rtpmutex.Unlock()
 		return
 	}
-	ss.rtpmutex.RUnlock()
+	ss.rtpmutex.Unlock()
 
 	ss.rtpChan <- true
 }
 
-func (ss *SipSession) startRTPStreaming() {
+func (ss *SipSession) startRTPStreaming(filename string) {
 	ss.rtpmutex.Lock()
 	if ss.isrtpstreaming {
 		ss.rtpmutex.Unlock()
@@ -293,9 +293,9 @@ func (ss *SipSession) startRTPStreaming() {
 
 	// filename := "Ba3dSeneen"
 	// filename := "MayserreemRingTone"
-	filename := "ErsemAlb"
-	pcm, ok := MRFRepos.Get("999", filename)
-	data := rtp.PCM2G722(*pcm) // TODO transcode for the selected ss.rtpPayload
+	// filename := "ErsemAlb"
+	pcm, ok := MRFRepos.Get("999", filename) // TODO build repos and manage them from UI
+	data := rtp.PCM2G722(*pcm)               // TODO transcode for the selected ss.rtpPayload
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
 		goto finish
@@ -306,8 +306,7 @@ func (ss *SipSession) startRTPStreaming() {
 		defer tckr.Stop()
 
 		Marker := true
-		// ss.rtpIndex = 0 // TODO put it zero if file change
-		audiopayloadsize := 160
+		// ss.rtpIndex = 0 // TODO put it zero if file changes
 
 		for {
 			select {
@@ -315,28 +314,28 @@ func (ss *SipSession) startRTPStreaming() {
 				goto finish
 			case <-tckr.C:
 			}
+
 			if ss.IsCallHeld {
 				goto finish
 			}
-			ss.rtpTimeStmp += uint32(audiopayloadsize)
-			// buf := MediaBufferPool.Get().(*[]byte)
-			// pkt := (*buf)[:172]
-			// MediaBufferPool.Put(buf)
 
-			pkt := make([]byte, 0, audiopayloadsize+12)
-
+			ss.rtpTimeStmp += uint32(RTPPayloadSize)
 			if ss.rtpSequenceNum == math.MaxUint16 {
 				ss.rtpSequenceNum = 0
+			} else {
+				ss.rtpSequenceNum++
 			}
+
+			pkt := RTPTXBufferPool.Get().([]byte)[:0]
 
 			delta := len(data) - ss.rtpIndex
 			var payload []byte
-			if audiopayloadsize <= delta {
-				payload = (data)[ss.rtpIndex : ss.rtpIndex+audiopayloadsize]
-				ss.rtpIndex += audiopayloadsize
+			if RTPPayloadSize <= delta {
+				payload = (data)[ss.rtpIndex : ss.rtpIndex+RTPPayloadSize]
+				ss.rtpIndex += RTPPayloadSize
 			} else {
 				payload = (data)[ss.rtpIndex : ss.rtpIndex+delta]
-				for n := delta; n < audiopayloadsize; n++ {
+				for n := delta; n < RTPPayloadSize; n++ {
 					payload = append(payload, 251)
 				}
 				ss.rtpIndex += delta
@@ -350,8 +349,9 @@ func (ss *SipSession) startRTPStreaming() {
 			pkt = append(pkt, payload...)
 
 			ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
-			ss.rtpSequenceNum++
+
 			Marker = false
+			RTPTXBufferPool.Put(pkt[:0])
 		}
 	}
 

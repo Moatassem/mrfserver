@@ -22,17 +22,21 @@ import (
 
 func InitializeEngine() {
 	responsesHeadersInit()
-	BufferPool = newSyncPool(BufferSize)
-	MediaBufferPool = newSyncPool(MediaBufferSize)
+
+	BufferPool = newSyncPool(BufferSize, BufferSize)
+
+	rtpsz := RTPHeaderSize + RTPPayloadSize
+	RTPRXBufferPool = newSyncPool(rtpsz, rtpsz)
+	RTPTXBufferPool = newSyncPool(0, rtpsz)
+
 	IsSystemBigEndian = checkSystemIndian()
 	rtp.InitializeTX()
 }
 
-func newSyncPool(bsz int) *sync.Pool {
+func newSyncPool(bsz, csz int) *sync.Pool {
 	return &sync.Pool{
 		New: func() any {
-			b := make([]byte, bsz)
-			return &b
+			return make([]byte, bsz, csz)
 		},
 	}
 }

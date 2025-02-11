@@ -104,7 +104,7 @@ var (
 
 type Packet struct {
 	sourceAddr *net.UDPAddr
-	buffer     *[]byte
+	buffer     []byte
 	bytesCount int
 }
 
@@ -127,8 +127,8 @@ func udpLoopWorkers(conn *net.UDPConn) {
 	}()
 	go func() {
 		for {
-			buf := BufferPool.Get().(*[]byte)
-			n, addr, err := conn.ReadFromUDP(*buf)
+			buf := BufferPool.Get().([]byte)
+			n, addr, err := conn.ReadFromUDP(buf)
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -150,7 +150,7 @@ func worker(id int, conn *net.UDPConn, queue <-chan Packet) {
 }
 
 func processPacket(packet Packet, conn *net.UDPConn) {
-	pdu := (*packet.buffer)[:packet.bytesCount]
+	pdu := packet.buffer[:packet.bytesCount]
 	for {
 		if len(pdu) == 0 {
 			break
