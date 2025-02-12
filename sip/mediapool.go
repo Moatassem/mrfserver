@@ -22,11 +22,6 @@ func NewMediaPortPool() *MediaPool {
 	return mpp
 }
 
-func removeAt(slice []int, i int) []int {
-	slice[i] = slice[len(slice)-1] // Move last element to index i
-	return slice[:len(slice)-1]    // Trim the last element
-}
-
 func (mpp *MediaPool) ReserveSocket() *net.UDPConn {
 	mpp.mu.Lock()
 	defer mpp.mu.Unlock()

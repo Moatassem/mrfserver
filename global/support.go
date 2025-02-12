@@ -517,6 +517,11 @@ func GetEnum[T1 comparable, T2 comparable](m map[T1]T2, i T2) T1 {
 	return rslt
 }
 
+func RemoveAt(slice []int, i int) []int {
+	slice[i] = slice[len(slice)-1] // Move last element to index i
+	return slice[:len(slice)-1]    // Trim the last element
+}
+
 // ===================================================================
 
 func StringToHexString(input string) string {
