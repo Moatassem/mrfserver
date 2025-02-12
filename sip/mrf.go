@@ -125,7 +125,7 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	}
 	ss.WithTeleEvents = dtmfFormat != nil
 
-	rmedia, err := BuildUDPSocket(conn.Address, media.Port)
+	rmedia, err := BuildUDPAddr(conn.Address, media.Port)
 	if err != nil {
 		sipcode = status.NotAcceptableHere
 		q850code = q850.ChannelUnacceptable
@@ -259,6 +259,7 @@ func (ss *SipSession) mediaReceiver() {
 		if n == 16 { // TODO check if no RFC 4733 is negotiated - transcode InBand DTMF into teleEvents
 			ts := binary.BigEndian.Uint32(bytes[4:8]) //TODO check how to use IsSystemBigEndian
 			if ss.rtpRFC4733TS != ts {
+				ss.rtpRFC4733TS = ts
 				dtmf := DicDTMFEvent[bytes[12]]
 				fmt.Printf("RFC 4733 Received: %s\n", dtmf)
 				switch dtmf {
@@ -267,8 +268,6 @@ func (ss *SipSession) mediaReceiver() {
 				case "DTMF *":
 
 				}
-
-				ss.rtpRFC4733TS = ts
 			}
 		}
 	}
@@ -298,6 +297,7 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 	ss.isrtpstreaming = true
 	ss.rtpmutex.Unlock()
 
+	// TODO see if i can support more codecs
 	pcm, ok := MRFRepos.Get("999", filename) // TODO build repos and manage them from UI
 	if !ok {
 		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
@@ -308,7 +308,7 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 
 	// TODO only allow ptime:20 .. i.e. 160 bytes/packet/20ms
 	{
-		data, silence := rtp.TxPCMnSilence(*pcm, ss.rtpPayload)
+		data, silence := rtp.TxPCMnSilence(pcm, ss.rtpPayload)
 		if data == nil {
 			goto finish1
 		}

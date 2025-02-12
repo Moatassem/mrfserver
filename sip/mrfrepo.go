@@ -8,15 +8,22 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
-const UPart string = "999"
+const (
+	UPart      string  = "999"
+	sampleRate float64 = 16000
+
+	ExtRaw string = "raw"
+	ExtWav string = "wav"
+)
 
 var MRFRepos *MRFRepoCollection
 
 type MRFRepoCollection struct {
 	mu   sync.RWMutex
-	maps *map[string]map[string]*[]int16
+	maps map[string]map[string][]int16
 }
 
 func NewMRFRepoCollection() *MRFRepoCollection {
@@ -33,9 +40,17 @@ func dropExtension(fn string) string {
 	return fn[:idx]
 }
 
-func loadMedia() *map[string]map[string]*[]int16 {
-	mp := make(map[string]map[string]*[]int16)
-	mp[UPart] = make(map[string]*[]int16)
+func getExtension(fn string) string {
+	idx := strings.LastIndex(fn, ".")
+	if idx == -1 {
+		return "<no extension>"
+	}
+	return global.ASCIIToLower(fn[idx+1:])
+}
+
+func loadMedia() map[string]map[string][]int16 {
+	mp := make(map[string]map[string][]int16)
+	mp[UPart] = make(map[string][]int16)
 
 	dentries, err := os.ReadDir(global.MediaPath)
 	if err != nil {
@@ -46,61 +61,77 @@ func loadMedia() *map[string]map[string]*[]int16 {
 			continue
 		}
 		fullpath := filepath.Join(global.MediaPath, dentry.Name())
-		fmt.Println(fullpath)
 
-		pcmBytes, err := rtp.RawToPcm(fullpath)
+		var pcmBytes []int16
+		var err error
+
+		switch ext := getExtension(dentry.Name()); ext {
+		case ExtRaw:
+			pcmBytes, err = rtp.ReadPCMRaw(fullpath)
+		case ExtWav:
+			pcmBytes, err = rtp.ReadPCMWav(fullpath)
+		default:
+			fmt.Printf("Filename: %s - Unsupported Extension: %s - Skipped\n", dentry.Name(), ext)
+			continue
+		}
+
 		if err != nil {
 			continue
 		}
 
-		// codec := "G722"
+		// Calculate duration
+		duration := float64(len(pcmBytes)) / sampleRate
 
-		// output := make([]byte, len(pcmBytes))
-		// for i, sample := range pcmBytes {
-		// 	switch codec {
-		// 	case "PCMA":
-		// 		output[i] = rtp.PCMToALaw(sample)
-		// 	case "PCMU":
-		// 		output[i] = rtp.PCMToMuLaw(sample)
-		// 	}
-		// }
-		// output := rtp.PCM2G722(pcmBytes)
+		fmt.Printf("Filename: %s, Duration: %s\n", dentry.Name(), formattedTime(duration))
 
-		// // Decode MP3 to PCM
-		// decoder, err := mp3.NewDecoder(bytes.NewReader(audioBytes))
-		// if err != nil {
-		// 	fmt.Println("Error decoding mp3 file", err)
-		// 	continue
-		// }
-
-		// pcmBytes := make([]byte, 6217800)
-		// _, err = decoder.Read(pcmBytes)
-		// if err != nil {
-		// 	panic(err)
-		// }
-		mp[UPart][dropExtension(dentry.Name())] = &pcmBytes
+		mp[UPart][dropExtension(dentry.Name())] = pcmBytes
 	}
 
-	return &mp
+	return mp
+}
+
+func formattedTime(totsec float64) string {
+	duration := time.Duration(totsec * float64(time.Second))
+
+	minutes := int(duration.Minutes())
+	seconds := int(duration.Seconds()) % 60
+	milliseconds := int(duration.Milliseconds()) % 1000
+
+	return fmt.Sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds)
+}
+
+func (mrfr *MRFRepoCollection) FilesCount() int {
+	mrfr.mu.RLock()
+	defer mrfr.mu.RUnlock()
+	mp, ok := mrfr.maps[UPart]
+	if ok {
+		return len(mp)
+	}
+	return 0
 }
 
 func (mrfr *MRFRepoCollection) DoesMRFRepoExist(upart string) bool {
-	_, ok := (*mrfr.maps)[upart]
+	mrfr.mu.RLock()
+	defer mrfr.mu.RUnlock()
+	_, ok := mrfr.maps[upart]
 	return ok
 }
 
-func (mrfr *MRFRepoCollection) Get(upart, key string) (*[]int16, bool) {
+func (mrfr *MRFRepoCollection) Get(upart, key string) ([]int16, bool) {
 	mrfr.mu.RLock()
 	defer mrfr.mu.RUnlock()
-	if mp, ok := (*mrfr.maps)[upart]; ok {
+	if mp, ok := mrfr.maps[upart]; ok {
 		ivr, ok := mp[key]
+		if ivr == nil || len(ivr) == 0 {
+			return nil, false
+		}
 		return ivr, ok
 	}
 	return nil, false
 }
 
-func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes *[]int16) {
+func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes []int16) {
 	mrfr.mu.Lock()
 	defer mrfr.mu.Unlock()
-	(*mrfr.maps)[upart][key] = bytes
+	mrfr.maps[upart][key] = bytes
 }

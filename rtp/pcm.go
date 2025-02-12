@@ -84,28 +84,84 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+
+	"github.com/go-audio/wav"
 )
 
-// TODO read about adding sox wrapper
-
-func RawToPcm(filename string) ([]int16, error) {
+func ReadPCMRaw(filename string) ([]int16, error) {
 	file, err := os.ReadFile(filename)
 	if err != nil {
 		fmt.Println("Error opening file:", err)
 		return nil, err
 	}
-	pcmData := bytesToInt16(file)
+	pcmData := bytesToInt16s(file)
+	return pcmData, nil
+}
+
+func ReadPCMWav(filename string) ([]int16, error) {
+	// Open the WAV file
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println("Error opening file:", err)
+		return nil, err
+	}
+	defer file.Close()
+
+	// Create a new WAV decoder
+	decoder := wav.NewDecoder(file)
+
+	// Check if the file is valid and not corrupt
+	if !decoder.IsValidFile() {
+		fmt.Println("Invalid WAV file")
+		return nil, err
+	}
+
+	// Decode the WAV file
+	buffer, err := decoder.FullPCMBuffer()
+	if err != nil {
+		fmt.Println("Error decoding file:", err)
+		return nil, err
+	}
+
+	// Convert PCM data to int16 slice
+	// pcmData := intsToInt16s(buffer.Data)
+	pcmData := intsToInt16sSpeed(buffer.Data, 2)
+
+	// pcmData := bytesToInt16(file)
 	// Output PCM sample count
 	fmt.Println("PCM Data Length:", len(pcmData))
 	return pcmData, nil
 }
 
-// bytesToInt16 converts a byte slice into a slice of int16 samples
-func bytesToInt16(data []byte) []int16 {
+// bytesToInt16s converts a byte slice into a slice of int16 samples
+func bytesToInt16s(data []byte) []int16 {
 	int16Data := make([]int16, len(data)/2)
 	err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &int16Data)
 	if err != nil {
 		fmt.Println("Error converting to int16:", err)
 	}
+	return int16Data
+}
+
+func intsToInt16s(data []int) []int16 {
+	int16Data := make([]int16, len(data))
+	for i, v := range data {
+		int16Data[i] = int16(v) // Direct conversion
+	}
+	return int16Data
+}
+
+func intsToInt16sSpeed(data []int, speedFactor int) []int16 {
+	if speedFactor < 1 {
+		speedFactor = 1 // Prevent invalid values
+	}
+
+	newLength := len(data) / speedFactor
+	int16Data := make([]int16, newLength)
+
+	for i := 0; i < newLength; i++ {
+		int16Data[i] = int16(data[i*speedFactor])
+	}
+
 	return int16Data
 }

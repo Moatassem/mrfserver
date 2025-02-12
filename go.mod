@@ -3,6 +3,8 @@ module MRFGo
 go 1.23.6
 
 require (
+	github.com/go-audio/audio v1.0.0
+	github.com/go-audio/wav v1.1.0
 	github.com/gotranspile/g722 v0.0.0-20240123003956-384a1bb16a19
 	github.com/prometheus/client_golang v1.20.5
 )
@@ -10,6 +12,7 @@ require (
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
+	github.com/go-audio/riff v1.0.0 // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect

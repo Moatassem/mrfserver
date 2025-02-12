@@ -78,7 +78,7 @@ func GetUDPortFromConn(conn *net.UDPConn) int {
 	return conn.LocalAddr().(*net.UDPAddr).Port
 }
 
-func BuildUDPSocket(ip string, prt int) (*net.UDPAddr, error) {
+func BuildUDPAddr(ip string, prt int) (*net.UDPAddr, error) {
 	return net.ResolveUDPAddr("udp", fmt.Sprintf("%s:%d", ip, prt))
 }
 
