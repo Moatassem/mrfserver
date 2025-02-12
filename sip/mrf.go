@@ -22,6 +22,7 @@ import (
 	"MRFGo/sip/state"
 	"MRFGo/sip/status"
 	"encoding/binary"
+	"encoding/xml"
 	"fmt"
 	"math"
 	"net"
@@ -229,7 +230,7 @@ func (ss *SipSession) answerMRF(trans *Transaction, sipmsg *SipMessage) {
 	ss.rtpSequenceNum = uint16(RandomNum(1000, 2000))
 	ss.rtpTimeStmp = 0
 
-	ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
+	ss.SendResponse(trans, status.OK, NewMessageSDPBody(ss.LocalSDP.Bytes()))
 }
 
 func (ss *SipSession) mediaReceiver() {
@@ -395,6 +396,54 @@ func uint32ToBytes(num uint32) []byte {
 	bytes := make([]byte, 4)
 	binary.BigEndian.PutUint32(bytes, num)
 	return bytes
+}
+
+// ============================================================================
+// ============================================================================
+// Request:
+type MSCRequest struct {
+	XMLName xml.Name `xml:"MediaServerControl"`
+	Version string   `xml:"version,attr"`
+	Request struct {
+		Play        *Play        `xml:"play,omitempty"`
+		PlayCollect *PlayCollect `xml:"playcollect,omitempty"`
+	} `xml:"request"`
+}
+
+type Play struct {
+	Prompt Prompt `xml:"prompt"`
+}
+
+type PlayCollect struct {
+	MaxDigits       int    `xml:"maxdigits,attr"`
+	Barge           string `xml:"barge,attr"`
+	ExtraDigitTimer string `xml:"extradigittimer,attr"`
+	FirstDigitTimer string `xml:"firstdigittimer,attr"`
+	Prompt          Prompt `xml:"prompt"`
+}
+
+type Prompt struct {
+	Repeat string  `xml:"repeat,attr,omitempty"`
+	Audio  []Audio `xml:"audio"`
+}
+
+type Audio struct {
+	URL string `xml:"url,attr"`
+}
+
+// Response:
+type MSCResponse struct {
+	XMLName  xml.Name `xml:"MediaServerControl"`
+	Version  string   `xml:"version,attr"`
+	Response struct {
+		PlayDuration int    `xml:"playduration,attr"`
+		Reason       string `xml:"reason,attr"`
+		PlayOffset   int    `xml:"playoffset,attr"`
+		Text         string `xml:"text,attr"`
+		Request      string `xml:"request,attr"`
+		Code         int    `xml:"code,attr"`
+		Digits       string `xml:"digits,attr,omitempty"`
+	} `xml:"response"`
 }
 
 // ============================================================================

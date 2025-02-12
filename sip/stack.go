@@ -439,16 +439,18 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.SendResponseDetailed(trans, NewResponsePackRFWarning(status.RequestPending, "", "Competing ReINVITE rejected"), EmptyBody())
 				return
 			}
-			if sipmsg.Body.ContainsSDP() {
+			switch {
+			case sipmsg.Body.WithNoBody():
+				ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported delayed offer"), EmptyBody())
+			case sipmsg.Body.ContainsSDP():
 				sc, qc, wr := ss.buildSDPAnswer(sipmsg)
 				if sc != 0 {
 					ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(sc, qc, wr), EmptyBody())
 					return
 				}
-				ss.SendResponse(trans, status.OK, *NewMessageSDPBody(ss.LocalSDP.Bytes()))
-			} else {
-				// TODO if ReINVITE is delayed offer
-				ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(status.NotAcceptableHere, q850.BearerCapabilityNotImplemented, "Not supported delayed offer"), EmptyBody())
+				ss.SendResponse(trans, status.OK, NewMessageSDPBody(ss.LocalSDP.Bytes()))
+			default:
+				ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(status.ServiceUnavailable, q850.InterworkingUnspecified, "Not supported action"), EmptyBody())
 			}
 		case ACK:
 			if trans.Method == INVITE {
@@ -491,18 +493,25 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.DropMe()
 				return
 			}
-			//TODO pass it on or handle locally
-			ss.SendResponse(trans, 200, EmptyBody()) //handle in-dialogue locally
+			ss.SendResponse(trans, 200, EmptyBody())
 		case UPDATE:
-			if sipmsg.Body.WithNoBody() {
-				ss.SendResponse(trans, 200, EmptyBody()) //handle in-dialogue locally
-				return
+			switch {
+			case sipmsg.Body.WithNoBody():
+				ss.SendResponse(trans, 200, EmptyBody())
+			case sipmsg.Body.ContainsSDP():
+				sc, qc, wr := ss.buildSDPAnswer(sipmsg)
+				if sc != 0 {
+					ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(sc, qc, wr), EmptyBody())
+					return
+				}
+				ss.SendResponse(trans, status.OK, NewMessageSDPBody(ss.LocalSDP.Bytes()))
+			default:
+				ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(status.ServiceUnavailable, q850.InterworkingUnspecified, "Not supported action"), EmptyBody())
 			}
-			// TODO handle similarly like ReINVITE
 		case PRACK:
 			ss.SendResponse(trans, status.OK, EmptyBody())
 		case INFO:
-			// TODO handle this
+			// TODO handle this to get MSCL
 			ss.SendResponse(trans, status.OK, EmptyBody())
 		default: //REFER, REGISTER, SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
 			ss.SetState(state.Dropped)

@@ -17,6 +17,7 @@ const (
 
 	ExtRaw string = "raw"
 	ExtWav string = "wav"
+	ExtMp3 string = "mp3"
 )
 
 var MRFRepos *MRFRepoCollection
@@ -60,31 +61,39 @@ func loadMedia() map[string]map[string][]int16 {
 		if dentry.IsDir() {
 			continue
 		}
-		fullpath := filepath.Join(global.MediaPath, dentry.Name())
+		filename := dentry.Name()
+		fullpath := filepath.Join(global.MediaPath, filename)
 
 		var pcmBytes []int16
 		var err error
+		var rawpath string
 
-		switch ext := getExtension(dentry.Name()); ext {
+		filenameonly := dropExtension(filename)
+
+		switch ext := getExtension(filename); ext {
 		case ExtRaw:
 			pcmBytes, err = rtp.ReadPCMRaw(fullpath)
-		case ExtWav:
-			pcmBytes, err = rtp.ReadPCMWav(fullpath)
+		case ExtWav, ExtMp3:
+			rawpath, err = rtp.RunSox(global.MediaPath, filename, filenameonly)
+			if err == nil {
+				pcmBytes, err = rtp.ReadPCMRaw(rawpath)
+			}
 		default:
-			fmt.Printf("Filename: %s - Unsupported Extension: %s - Skipped\n", dentry.Name(), ext)
+			fmt.Printf("Filename: %s - Unsupported Extension: %s - Skipped\n", filename, ext)
 			continue
 		}
 
 		if err != nil {
+			fmt.Println(err)
 			continue
 		}
 
 		// Calculate duration
 		duration := float64(len(pcmBytes)) / sampleRate
 
-		fmt.Printf("Filename: %s, Duration: %s\n", dentry.Name(), formattedTime(duration))
+		fmt.Printf("Filename: %s, Duration: %s\n", filename, formattedTime(duration))
 
-		mp[UPart][dropExtension(dentry.Name())] = pcmBytes
+		mp[UPart][filenameonly] = pcmBytes
 	}
 
 	return mp

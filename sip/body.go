@@ -40,8 +40,8 @@ func NewMessageBody(init bool) *MessageBody {
 	return new(MessageBody)
 }
 
-func NewMessageSDPBody(sdpbytes []byte) *MessageBody {
-	mb := &MessageBody{PartsContents: make(map[BodyType]ContentPart)}
+func NewMessageSDPBody(sdpbytes []byte) MessageBody {
+	mb := MessageBody{PartsContents: make(map[BodyType]ContentPart)}
 	mb.PartsContents[SDP] = ContentPart{Bytes: sdpbytes}
 	return mb
 }
