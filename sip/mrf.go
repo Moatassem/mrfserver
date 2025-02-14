@@ -274,7 +274,7 @@ func (ss *SipSession) mediaReceiver() {
 				fmt.Printf("Inband telephone-event - RFC 4733 - Received: %s\n", dtmf)
 				switch dtmf {
 				case "DTMF #":
-					ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
+					// ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
 				case "DTMF *":
 
 				}
@@ -296,7 +296,7 @@ func (ss *SipSession) parseDTMF(bytes []byte, m Method, bt BodyType) {
 	if signal == "" {
 		return
 	}
-	fmt.Printf("OOB DTMF - SIP %s (%s) - Received: %s\n", m.String(), DicBodyContentType[bt], signal)
+	fmt.Printf("OOB DTMF - %s (%s) - Received: %s\n", m.String(), DicBodyContentType[bt], signal)
 }
 
 func (ss *SipSession) stopRTPStreaming() {

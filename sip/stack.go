@@ -519,7 +519,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			if ok {
 				switch btype {
 				case DTMFRelay:
-					ss.parseDTMF(bytes, btype, method)
+					ss.parseDTMF(bytes, method, btype)
 				case DTMF:
 
 				case MSCXML: // TODO handle this to get MSCL
