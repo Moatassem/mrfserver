@@ -26,6 +26,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"unicode"
 	"unicode/utf8"
 )
 
@@ -145,11 +146,13 @@ func GetUsedSize(pdu []byte) int {
 }
 
 func DropVisualSeparators(strng string) string {
-	strng = strings.ReplaceAll(strng, ".", "")
-	strng = strings.ReplaceAll(strng, "-", "")
-	strng = strings.ReplaceAll(strng, "(", "")
-	strng = strings.ReplaceAll(strng, ")", "")
-	return strng
+	var sb strings.Builder
+	for _, r := range strng {
+		if unicode.IsDigit(r) || r == '+' {
+			sb.WriteRune(r)
+		}
+	}
+	return sb.String()
 }
 
 func CleanAndSplitHeader(HeaderValue string, DropParameterValueDQ ...bool) map[string]string {
@@ -241,17 +244,17 @@ func ParseParameters(parsline string) *map[string]string {
 	}
 	tpls := strings.Split(parsline, ";")
 	for _, tpl := range tpls {
-		tmp := strings.Split(tpl, "=")
+		tmp := strings.SplitN(tpl, "=", 2)
 		switch len(tmp) {
-		case 2:
-			if _, ok := parsMap[tmp[0]]; !ok {
-				parsMap[tmp[0]] = tmp[1]
-			} else {
-				LogError(LTSIPStack, fmt.Sprintf("duplicate parameter: [%s] - in line: [%s]", tmp[0], parsline))
-			}
 		case 1:
 			if _, ok := parsMap[tmp[0]]; !ok {
 				parsMap[tmp[0]] = ""
+			} else {
+				LogError(LTSIPStack, fmt.Sprintf("duplicate parameter: [%s] - in line: [%s]", tmp[0], parsline))
+			}
+		case 2:
+			if _, ok := parsMap[tmp[0]]; !ok {
+				parsMap[tmp[0]] = tmp[1]
 			} else {
 				LogError(LTSIPStack, fmt.Sprintf("duplicate parameter: [%s] - in line: [%s]", tmp[0], parsline))
 			}

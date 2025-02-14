@@ -54,7 +54,7 @@ func NewSHQ850OrSIP(Q850OrSIP int, Details string, retryAfter string) SipHeaders
 	}
 	if Q850OrSIP == 0 {
 		if strings.TrimSpace(Details) != "" {
-			headers.AddHeader(Warning, fmt.Sprintf("399 Newkah \"%s\"", Details))
+			headers.AddHeader(Warning, fmt.Sprintf("399 MRFGo \"%s\"", Details))
 		}
 	} else {
 		var reason string

@@ -74,7 +74,7 @@ type SipSession struct {
 	rtpTimeStmp    uint32
 	rtpSSRC        uint32
 	rtpIndex       int
-	rtpPayload     uint8
+	rtpPayloadType uint8
 	rtpmutex       sync.Mutex
 	isrtpstreaming bool
 
@@ -84,8 +84,8 @@ type SipSession struct {
 
 	RemoteBody        MessageBody //to save incoming body if SDP is included
 	SDPHashValue      string
-	SDPSessionID      uint64
-	SDPSessionVersion uint64
+	SDPSessionID      int64
+	SDPSessionVersion int64
 
 	IsDisposed    bool
 	multiUseMutex sync.Mutex // used for synchronizing no18x & noAns timers, probing & max duration, dropping session
@@ -826,7 +826,7 @@ func (session *SipSession) ProcessRequestHeaders(trans *Transaction, sipmsg *Sip
 	// PRACK specific headers
 	if sipmsg.StartLine.Method == PRACK && !session.IsPRACKSupported {
 		LogWarning(LTSIPStack, fmt.Sprintf("UAS requesting 100rel although not offered - Call ID [%s]", session.CallID))
-		hdrs.AddHeader(Warning, `399 Newkah "100rel was not offered, yet it was requested"`)
+		hdrs.AddHeader(Warning, `399 MRFGo "100rel was not offered, yet it was requested"`)
 	}
 
 	// ReINVITE specific headers

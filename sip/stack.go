@@ -71,10 +71,11 @@ func processPDU(payload []byte) (*SipMessage, []byte, error) {
 		startLine.StartLine = msglines[0]
 		if startLine.Method == INVITE && RMatch(startLine.Ruri, INVITERURI, &matches) {
 			startLine.UriScheme = ASCIIToLower(matches[1])
-			startLine.UserPart = matches[2]
-			startLine.HostPart = matches[4]
+			startLine.UserPart = DropVisualSeparators(matches[2])
 			startLine.UserParameters = ParseParameters(matches[3])
-			startLine.UriParameters = ParseParameters(matches[5])
+			startLine.Password = strings.TrimLeft(matches[4], ":")
+			startLine.HostPart = matches[5]
+			startLine.UriParameters = ParseParameters(matches[6])
 		}
 	} else {
 		if RMatch(msglines[lnIdx], ResponseStartLinePattern, &matches) {
@@ -462,12 +463,11 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.StartMaxCallDuration()
 				ss.StartInDialogueProbing()
 				go ss.mediaReceiver()
-				go ss.startRTPStreaming("ErsemAlb")
+				go ss.startRTPStreaming("Mayserreem", false, false, false)
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)
-					// TODO update streaming if codec has changed
-					go ss.startRTPStreaming("ErsemAlb")
+					go ss.startRTPStreaming("ErsemAlb", false, true, true)
 				}
 			}
 		case CANCEL:

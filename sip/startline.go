@@ -26,6 +26,7 @@ type SipStartLine struct {
 	UserPart       string
 	HostPart       string
 	UserParameters *map[string]string
+	Password       string
 
 	StatusCode   int
 	ReasonPhrase string

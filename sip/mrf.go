@@ -66,7 +66,7 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	sdpbytes, _ := sipmsg.GetBodyPart(SDP)
 	sdpses, err := sdp.Parse(sdpbytes)
 	if err != nil {
-		sipcode = status.NotAcceptableHere
+		sipcode = status.UnsupportedMediaType
 		q850code = q850.BearerCapabilityNotImplemented
 		warn = "Not supported SDP"
 		return
@@ -106,25 +106,27 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 		media.Chosen = true
 		break
 	}
+
 	if conn == nil {
 		sipcode = status.NotAcceptableHere
 		q850code = q850.MandatoryInformationElementIsMissing
-		warn = "No available media connection found"
+		warn = "No media connection found"
 		return
 	}
+
 	if media == nil {
 		sipcode = status.NotAcceptableHere
 		q850code = q850.BearerCapabilityNotAvailable
-		warn = "No available SDP found"
+		warn = "No SDP audio offer found"
 		return
 	}
+
 	if audioFormat == nil {
 		sipcode = status.NotAcceptableHere
 		q850code = q850.IncompatibleDestination
 		warn = "No common audio codec found"
 		return
 	}
-	ss.WithTeleEvents = dtmfFormat != nil
 
 	rmedia, err := BuildUDPAddr(conn.Address, media.Port)
 	if err != nil {
@@ -137,11 +139,7 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	ss.RemoteMedia = rmedia
 	ss.IsCallHeld = sdpses.IsCallHeld()
 
-	// TODO need to handle incoming ReINVITE and UPDPATE
-	// need to handle CANCEL (put some delay before answering?)
-	// need to handle INFO to play the required audio files
-	// need to handle DTMF
-	// TODO need to build RTP packets and stream media back
+	// TODO need to handle CANCEL (put some delay before answering?)
 	if ss.MediaListener == nil {
 		ss.MediaListener = MediaPorts.ReserveSocket()
 	}
@@ -155,8 +153,8 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	mySDP := &sdp.Session{
 		Origin: &sdp.Origin{
 			Username:       "mt",
-			SessionID:      1, // will be updated by updateSDPPart in PrepareMessageBytes
-			SessionVersion: 1, // will be updated by updateSDPPart in PrepareMessageBytes
+			SessionID:      ss.SDPSessionID,
+			SessionVersion: ss.SDPSessionVersion,
 			Network:        sdp.NetworkInternet,
 			Type:           sdp.TypeIPv4,
 			Address:        ServerIPv4.String(),
@@ -215,8 +213,15 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 		}
 		mySDP.Media = append(mySDP.Media, newmedia)
 	}
+
+	if ss.LocalSDP != nil && !mySDP.Equals(ss.LocalSDP) {
+		ss.SDPSessionVersion += 1
+		mySDP.Origin.SessionVersion = ss.SDPSessionVersion
+	}
+
 	ss.LocalSDP = mySDP
-	ss.rtpPayload = audioFormat.Payload
+	ss.rtpPayloadType = audioFormat.Payload
+	ss.WithTeleEvents = dtmfFormat != nil
 	return
 }
 
@@ -226,9 +231,12 @@ func (ss *SipSession) answerMRF(trans *Transaction, sipmsg *SipMessage) {
 		return
 	}
 
+	// initializations
 	ss.rtpSSRC = RandomNum(2000, 9000000)
 	ss.rtpSequenceNum = uint16(RandomNum(1000, 2000))
 	ss.rtpTimeStmp = 0
+	ss.SDPSessionID = int64(RandomNum(1000, 9000))
+	ss.SDPSessionVersion = 1
 
 	ss.SendResponse(trans, status.OK, NewMessageSDPBody(ss.LocalSDP.Bytes()))
 }
@@ -289,7 +297,7 @@ func (ss *SipSession) stopRTPStreaming() {
 	}
 }
 
-func (ss *SipSession) startRTPStreaming(filename string) {
+func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, dropCallflag bool) {
 	ss.rtpmutex.Lock()
 	if ss.isrtpstreaming {
 		ss.rtpmutex.Unlock()
@@ -298,18 +306,25 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 	ss.isrtpstreaming = true
 	ss.rtpmutex.Unlock()
 
+	origPayload := ss.rtpPayloadType
+
 	// TODO see if i can support more codecs
-	pcm, ok := MRFRepos.Get("999", filename) // TODO build repos and manage them from UI
+	pcm, ok := MRFRepos.Get("999", afname) // TODO build repos and manage them from UI
 	if !ok {
-		fmt.Printf("Cannot find file [%s]\n", filename) // TODO handle that in INFO .. use buffer ..
+		fmt.Printf("Cannot find audio [%s]\n", afname) // TODO handle that in INFO
 		goto finish1
 	}
 
-	// TODO get SIP Engine PCM2G711A & PCM2G711U
+	// {
+	// 	ulaw := rtp.PCM2G711U(pcm)
+	// 	pcm = rtp.G711U2PCM(ulaw)
+	// 	alaw := rtp.PCM2G711A(pcm)
+	// 	pcm = rtp.G711A2PCM(alaw)
+	// }
 
 	// TODO only allow ptime:20 .. i.e. 160 bytes/packet/20ms
 	{
-		data, silence := rtp.TxPCMnSilence(pcm, ss.rtpPayload)
+		data, silence := rtp.TxPCMnSilence(pcm, ss.rtpPayloadType)
 		if data == nil {
 			goto finish1
 		}
@@ -318,7 +333,12 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 		defer tckr.Stop()
 
 		Marker := true
-		// ss.rtpIndex = 0 // TODO put it zero if file changes
+
+		if resetflag { // TODO this flag has no real need, just reset the index each time
+			ss.rtpIndex = 0
+		}
+
+		isFinished := false // to know that streaming has reached its end
 
 		for {
 			select {
@@ -327,9 +347,15 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 			case <-tckr.C:
 			}
 
-			if ss.IsCallHeld {
+			if origPayload != ss.rtpPayloadType {
+				defer ss.startRTPStreaming(afname, false, loopflag, true)
 				goto finish1
 			}
+
+			// TODO uncomment below to allow pausing streaming when call is held
+			// if ss.IsCallHeld {
+			// 	goto finish1
+			// }
 
 			ss.rtpTimeStmp += uint32(RTPPayloadSize)
 			if ss.rtpSequenceNum == math.MaxUint16 {
@@ -337,8 +363,6 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 			} else {
 				ss.rtpSequenceNum++
 			}
-
-			pkt := RTPTXBufferPool.Get().([]byte)[:0]
 
 			delta := len(data) - ss.rtpIndex
 			var payload []byte
@@ -351,19 +375,33 @@ func (ss *SipSession) startRTPStreaming(filename string) {
 					payload = append(payload, silence)
 				}
 				ss.rtpIndex += delta
+				isFinished = true
 			}
 
-			pkt = append(pkt, 128)
-			pkt = append(pkt, bool2byte(Marker)*128+ss.rtpPayload)
-			pkt = append(pkt, uint16ToBytes(ss.rtpSequenceNum)...)
-			pkt = append(pkt, uint32ToBytes(ss.rtpTimeStmp)...)
-			pkt = append(pkt, uint32ToBytes(ss.rtpSSRC)...)
-			pkt = append(pkt, payload...)
-
-			ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
+			if !ss.IsCallHeld {
+				pkt := RTPTXBufferPool.Get().([]byte)[:0]
+				pkt = append(pkt, 128)
+				pkt = append(pkt, bool2byte(Marker)*128+ss.rtpPayloadType)
+				pkt = append(pkt, uint16ToBytes(ss.rtpSequenceNum)...)
+				pkt = append(pkt, uint32ToBytes(ss.rtpTimeStmp)...)
+				pkt = append(pkt, uint32ToBytes(ss.rtpSSRC)...)
+				pkt = append(pkt, payload...)
+				ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
+				RTPTXBufferPool.Put(pkt[:0])
+			}
 
 			Marker = false
-			RTPTXBufferPool.Put(pkt[:0])
+
+			if isFinished {
+				if loopflag {
+					ss.rtpIndex = 0
+					isFinished = false
+					Marker = true
+					continue
+				}
+				ss.rtpIndex = 0
+				break
+			}
 		}
 	}
 
@@ -377,6 +415,10 @@ finish2:
 	ss.rtpmutex.Lock()
 	ss.isrtpstreaming = false
 	ss.rtpmutex.Unlock()
+
+	if dropCallflag {
+		ss.ReleaseMe("audio finished")
+	}
 }
 
 func bool2byte(b bool) byte {

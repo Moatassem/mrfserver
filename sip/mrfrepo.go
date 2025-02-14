@@ -88,7 +88,7 @@ func loadMedia() map[string]map[string][]int16 {
 			continue
 		}
 
-		// Calculate duration
+		// Calculate duration -- TODO duration not accurate vs playback duration
 		duration := float64(len(pcmBytes)) / sampleRate
 
 		fmt.Printf("Filename: %s, Duration: %s\n", filename, formattedTime(duration))

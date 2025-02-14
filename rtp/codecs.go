@@ -2,7 +2,6 @@ package rtp
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/gotranspile/g722"
 	// "github.com/gotranspile/g722"
@@ -143,7 +142,7 @@ func PCM2G722(pcm []int16) []byte {
 	return g722
 }
 
-func PCM2G711A(pcmBytes []int16) []byte {
+func PCM2G711A1(pcmBytes []int16) []byte {
 	output := make([]byte, len(pcmBytes))
 	for i, sample := range pcmBytes {
 		output[i] = pcm2ALaw(sample)
@@ -151,7 +150,7 @@ func PCM2G711A(pcmBytes []int16) []byte {
 	return output
 }
 
-func PCM2G711U(pcmBytes []int16) []byte {
+func PCM2G711U1(pcmBytes []int16) []byte {
 	output := make([]byte, len(pcmBytes))
 	for i, sample := range pcmBytes {
 		output[i] = pcm2MuLaw(sample)
@@ -284,29 +283,6 @@ func mulaw2PCM(b byte) int16 {
 	}
 
 	return pcm
-}
-
-func main2() {
-	// Example usage
-	input := []byte{0x80, 0x81, 0x82} // Example G.711 A-law input
-
-	// Transcode G.711 A-law to mu-law
-	muLawOutput := G711ALawToMuLaw(input)
-	fmt.Println("G.711 A-law to mu-law:", muLawOutput)
-
-	// Transcode G.711 A-law to G.722
-	g722Output, err := G711ToG722(input, true)
-	if err != nil {
-		log.Fatalf("Failed to transcode to G.722: %v", err)
-	}
-	fmt.Println("G.711 A-law to G.722:", g722Output)
-
-	// Transcode G.722 back to G.711 A-law
-	aLawOutput, err := G722ToG711(g722Output, true)
-	if err != nil {
-		log.Fatalf("Failed to transcode back to G.711 A-law: %v", err)
-	}
-	fmt.Println("G.722 to G.711 A-law:", aLawOutput)
 }
 
 // const (

@@ -1,7 +1,7 @@
 # Media Resource Function (MRF) Server v1.0 - written from scratch in Golang
 
-- Highly optimized, high performance, modular, carrier-grade MRF with capacity **exceeding 1000 CAPS** and **50,000 concurrent sessions**
-- Highly customizable MRF supporting Media Server Control
+- Highly optimized, high performance, modular, carrier-grade MRFGo with capacity **exceeding 1000 CAPS** and **50,000 concurrent sessions**
+- Highly customizable MRFGo supporting Media Server Control
 - Docker-containerized compiled with golang:alpine
 
 ## Launching the build

@@ -276,7 +276,7 @@ func (sipmsg *SipMessage) GetRegistrationData() (contact, ext, ruri, ipport stri
 	if RMatch(contact1, INVITERURI, &mtch) {
 		ruri = mtch[0]
 		ext = mtch[2]
-		ipport = mtch[4]
+		ipport = mtch[5]
 	} else {
 		expiresInt = -100 // bad contact
 		return
@@ -347,32 +347,6 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 	var bb bytes.Buffer
 	var headers []string
 
-	// TODO .. i can drop this part since I've already the *sdp.Session .. to avoid []byte >> string >> []byte
-	updateSDPPart := func(sipmsg *SipMessage, ss *SipSession) {
-		ct, ok := sipmsg.Body.PartsContents[SDP]
-		if !ok {
-			return
-		}
-		hashvalue := HashSDPBytes(ct.Bytes)
-		if ss.SDPHashValue != hashvalue {
-			ss.SDPHashValue = hashvalue
-			ss.SDPSessionVersion += 1
-		}
-		if ss.SDPSessionID == 0 {
-			ss.SDPSessionID = uint64(RandomNum(1000, 9000))
-		}
-		lines := strings.Split(string(ct.Bytes), "\r\n")
-		for i, ln := range lines {
-			var mtch []string
-			if RMatch(ln, SDPOriginLine, &mtch) {
-				lines[i] = fmt.Sprintf("o=%s %v %v IN IP4 %v", mtch[1], ss.SDPSessionID, ss.SDPSessionVersion, mtch[4])
-				break
-			}
-		}
-		ct.Bytes = []byte(strings.Join(lines, "\r\n"))
-		sipmsg.Body.PartsContents[SDP] = ct
-	}
-
 	byteschan := make(chan []byte)
 
 	go func(bc chan<- []byte) {
@@ -381,7 +355,6 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 			sipmsg.Headers.SetHeader(Content_Type, "")
 			sipmsg.Headers.SetHeader(MIME_Version, "")
 		} else {
-			updateSDPPart(sipmsg, ss)
 			bdyparts := sipmsg.Body.PartsContents
 			if len(bdyparts) == 1 {
 				k, v := FirstKeyValue(bdyparts)
