@@ -430,7 +430,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			ss.SendResponse(trans, status.UnsupportedMediaType, EmptyBody())
 			return
 		}
-		switch sipmsg.GetMethod() {
+		switch method := sipmsg.GetMethod(); method {
 		case INVITE:
 			ss.SendResponse(trans, status.Trying, EmptyBody())
 			ss.RouteRequestInternal(trans, sipmsg)
@@ -519,7 +519,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			if ok {
 				switch btype {
 				case DTMFRelay:
-					ss.parseDTMF(bytes)
+					ss.parseDTMF(bytes, btype, method)
 				case DTMF:
 
 				case MSCXML: // TODO handle this to get MSCL
