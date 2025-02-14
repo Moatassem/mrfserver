@@ -122,13 +122,6 @@ func (sipmsg *SipMessage) AddRequestedBodyParts() {
 	}
 }
 
-// TODO need to check:
-// if only one part left: to remove ContentPart object - see KeepOnlyPart
-// if nothing left: to nullify parts i.e. sipmsg.Body.PartsBytes = nil
-// func (sipmsg *SipMessage) dropBodyPart(bt BodyType) {
-// 	delete(messagebody.PartsBytes, bt)
-// }
-
 func (sipmsg *SipMessage) KeepOnlyBodyPart(bt BodyType) bool {
 	msgbdy := sipmsg.Body
 	kys := Keys(msgbdy.PartsContents) //get all keys
@@ -157,6 +150,17 @@ func (sipmsg *SipMessage) KeepOnlyBodyPart(bt BodyType) bool {
 func (sipmsg *SipMessage) GetBodyPart(bt BodyType) ([]byte, bool) {
 	cntnt, ok := sipmsg.Body.PartsContents[bt]
 	return cntnt.Bytes, ok
+}
+
+func (sipmsg *SipMessage) GetSingleBody() (BodyType, []byte, bool) {
+	if sipmsg.Body.WithNoBody() || sipmsg.Body.WithUnknownBodyPart() {
+		return None, nil, false
+	}
+	if len(sipmsg.Body.PartsContents) > 1 {
+		return None, nil, false
+	}
+	bt, cp := FirstKeyValue(sipmsg.Body.PartsContents)
+	return bt, cp.Bytes, true
 }
 
 // ===========================================================================

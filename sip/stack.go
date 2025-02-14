@@ -511,8 +511,24 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 		case PRACK:
 			ss.SendResponse(trans, status.OK, EmptyBody())
 		case INFO:
-			// TODO handle this to get MSCL
-			ss.SendResponse(trans, status.OK, EmptyBody())
+			if sipmsg.Body.WithNoBody() {
+				ss.SendResponse(trans, status.OK, EmptyBody())
+				return
+			}
+			btype, bytes, ok := sipmsg.GetSingleBody()
+			if ok {
+				switch btype {
+				case DTMFRelay:
+					ss.parseDTMF(bytes)
+				case DTMF:
+
+				case MSCXML: // TODO handle this to get MSCL
+
+				}
+				ss.SendResponse(trans, status.OK, EmptyBody())
+				return
+			}
+			ss.SendResponseDetailed(trans, NewResponsePackSIPQ850Details(status.UnsupportedMediaType, q850.RequestedFacilityNotImplemented, "Not supported action"), EmptyBody())
 		default: //REFER, REGISTER, SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
 			ss.SetState(state.Dropped)
 			ss.SendResponse(trans, status.MethodNotAllowed, EmptyBody())

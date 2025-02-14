@@ -84,7 +84,7 @@ func (messagebody *MessageBody) WithUnknownBodyPart() bool {
 	if messagebody.WithNoBody() {
 		return false
 	}
-	if len(messagebody.PartsContents) == 0 {
+	if len(messagebody.PartsContents) == 0 { // means PartsContents initialized but nothing added
 		return true
 	}
 	for k := range messagebody.PartsContents {

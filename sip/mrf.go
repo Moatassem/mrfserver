@@ -27,6 +27,7 @@ import (
 	"math"
 	"net"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -265,12 +266,12 @@ func (ss *SipSession) mediaReceiver() {
 			fmt.Println("Received RTP from unknown remote connection")
 			continue
 		}
-		if n == 16 { // TODO check if no RFC 4733 is negotiated - transcode InBand DTMF into teleEvents
+		if ss.WithTeleEvents && n == 16 { // TODO check if no RFC 4733 is negotiated - transcode InBand DTMF into teleEvents
 			ts := binary.BigEndian.Uint32(bytes[4:8]) //TODO check how to use IsSystemBigEndian
 			if ss.rtpRFC4733TS != ts {
 				ss.rtpRFC4733TS = ts
 				dtmf := DicDTMFEvent[bytes[12]]
-				fmt.Printf("RFC 4733 Received: %s\n", dtmf)
+				fmt.Printf("Inband DTMF RFC 4733 Received: %s\n", dtmf)
 				switch dtmf {
 				case "DTMF #":
 					ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
@@ -280,6 +281,22 @@ func (ss *SipSession) mediaReceiver() {
 			}
 		}
 	}
+}
+
+func (ss *SipSession) parseDTMF(bytes []byte) {
+	strng := string(bytes)
+	var mtch []string
+	var signal string
+	for _, ln := range strings.Split(strng, "\r\n") {
+		if RMatch(ln, SignalDTMF, &mtch) {
+			signal = mtch[1]
+			break
+		}
+	}
+	if signal == "" {
+		return
+	}
+	fmt.Printf("OOB DTMF Received: %s\n", signal)
 }
 
 func (ss *SipSession) stopRTPStreaming() {

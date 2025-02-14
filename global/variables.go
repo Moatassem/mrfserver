@@ -168,8 +168,8 @@ var (
 		SDPPTDefinition:            regexp.MustCompile(`(?i)^a=rtpmap\s*:\s*\d+\s(.+)`),
 		CodecPolicy:                regexp.MustCompile(`(?i)(([0-9]|[1-9][0-9]|1[01][0-9]|12[0-7])|\*)`),
 		ObjectName:                 regexp.MustCompile(`(?i)^\[.+?\]$`),
-		SignalDTMF:                 regexp.MustCompile(`(?i)^\s*(Signal)\s*=\s*([^\r\n]+)$`),
-		DurationDTMF:               regexp.MustCompile(`(?i)^\s*(Duration)\s*=\s*([^\r\n]+)$`),
+		SignalDTMF:                 regexp.MustCompile(`(?i)^\s*Signal\s*=\s*([^\r\n]+)$`),
+		DurationDTMF:               regexp.MustCompile(`(?i)^\s*Duration\s*=\s*([^\r\n]+)$`),
 		ConfDropPart:               regexp.MustCompile(`(?i)^88(\d{1,2})[\*#]$`),
 		Tag:                        regexp.MustCompile(`(?i);tag=([^;]+)`),
 	}
