@@ -129,6 +129,13 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 		return
 	}
 
+	if Str2Int[int](sdpses.GetEffectivePTime()) != PacketizationTime {
+		sipcode = status.NotAcceptableHere
+		q850code = q850.BearerCapabilityNotImplemented
+		warn = "Packetization other than 20ms not supported"
+		return
+	}
+
 	rmedia, err := BuildUDPAddr(conn.Address, media.Port)
 	if err != nil {
 		sipcode = status.NotAcceptableHere

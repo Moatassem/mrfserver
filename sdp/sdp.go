@@ -50,6 +50,30 @@ func (s *Session) GetChosenMedia() *Media {
 	return nil
 }
 
+func (s *Session) GetEffectivePTime() string {
+	media := s.GetChosenMedia()
+	attrbnm := "ptime"
+	ptime := media.Attributes.Get(attrbnm)
+	if ptime != "" {
+		return ptime
+	}
+	ptime = s.Attributes.Get(attrbnm)
+	if ptime != "" {
+		return ptime
+	}
+	return "20"
+}
+
+// func (attrbs Attributes) GetAttributeValue(nm string) string {
+// 	for i := 0; i < len(attrbs); i++ {
+// 		attrb := attrbs[i]
+// 		if attrb.Name == "ptime" {
+// 			return attrb.Value
+// 		}
+// 	}
+// 	return ""
+// }
+
 func (s *Session) GetEffectiveConnection() string {
 	media := s.GetChosenMedia()
 	var ipv4 string
