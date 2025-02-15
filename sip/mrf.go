@@ -223,6 +223,12 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	ss.LocalSDP = mySDP
 	ss.rtpPayloadType = audioFormat.Payload
 	ss.WithTeleEvents = dtmfFormat != nil
+
+	if !ss.WithTeleEvents && ss.Detector == nil {
+		ss.Detector = rtp.NewDTMFDetector(65)
+		ss.PCMBytes = make([]byte, 0, 1120)
+	}
+
 	return
 }
 
@@ -261,25 +267,51 @@ func (ss *SipSession) mediaReceiver() {
 			continue
 		}
 		bytes := buf[:n]
-		RTPRXBufferPool.Put(buf)
+
 		if !AreUAddrsEqual(addr, ss.RemoteMedia) {
 			fmt.Println("Received RTP from unknown remote connection")
 			continue
 		}
-		if ss.WithTeleEvents && n == 16 { // TODO check if no RFC 4733 is negotiated - transcode InBand DTMF into teleEvents
-			ts := binary.BigEndian.Uint32(bytes[4:8]) //TODO check how to use IsSystemBigEndian
-			if ss.rtpRFC4733TS != ts {
-				ss.rtpRFC4733TS = ts
-				dtmf := DicDTMFEvent[bytes[12]]
-				fmt.Printf("Inband telephone-event - RFC 4733 - Received: %s\n", dtmf)
-				switch dtmf {
-				case "DTMF #":
-					// ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
-				case "DTMF *":
+		if ss.WithTeleEvents {
+			if n == 16 { // TODO check if no RFC 4733 is negotiated - transcode InBand DTMF into teleEvents
+				ts := binary.BigEndian.Uint32(bytes[4:8]) //TODO check how to use IsSystemBigEndian
+				if ss.rtpRFC4733TS != ts {
+					ss.rtpRFC4733TS = ts
+					dtmf := DicDTMFEvent[bytes[12]]
+					fmt.Printf("Inband - telephone-event (RFC 4733) - Received: %s\n", dtmf)
+					switch dtmf {
+					case "DTMF #":
+						// ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
+					case "DTMF *":
 
+					}
 				}
 			}
+		} else {
+			if n == 172 {
+				b1 := bytes[1]
+				if b1 >= 128 {
+					ss.NewDTMF = true
+					ss.PCMBytes = ss.PCMBytes[:0]
+				} else if ss.NewDTMF {
+					payload := bytes[12:]
+					if len(ss.PCMBytes) == 6*len(payload) {
+						ss.PCMBytes = append(ss.PCMBytes, payload...)
+						ss.NewDTMF = false
+						pcm := rtp.GetPCM(ss.PCMBytes, ss.rtpPayloadType)
+						ss.Detector.Detect(pcm)
+						runes := ss.Detector.GetAllDTMFTones()
+						fmt.Println(runes)
+						frmt := ss.LocalSDP.GetChosenMedia().FormatByPayload(ss.rtpPayloadType)
+						fmt.Printf("Inband - RTP Tone (%s) - Received: %s\n", frmt.Name, "<>")
+					} else {
+						ss.PCMBytes = append(ss.PCMBytes, payload...)
+					}
+				}
+				// ss.Detector.Detect()
+			}
 		}
+		RTPRXBufferPool.Put(buf)
 	}
 }
 
@@ -287,16 +319,21 @@ func (ss *SipSession) parseDTMF(bytes []byte, m Method, bt BodyType) {
 	strng := string(bytes)
 	var mtch []string
 	var signal string
-	for _, ln := range strings.Split(strng, "\r\n") {
-		if RMatch(ln, SignalDTMF, &mtch) {
-			signal = mtch[1]
-			break
+	if bt == DTMFRelay {
+		for _, ln := range strings.Split(strng, "\r\n") {
+			if RMatch(ln, SignalDTMF, &mtch) {
+				signal = mtch[1]
+				break
+			}
 		}
+	} else {
+		signal = strng
 	}
 	if signal == "" {
 		return
 	}
-	fmt.Printf("OOB DTMF - %s (%s) - Received: %s\n", m.String(), DicBodyContentType[bt], signal)
+	dtmf := DicDTMFEvent[DicDTMFSignal[signal]]
+	fmt.Printf("OOB - SIP %s (%s) - Received: %s\n", m.String(), DicBodyContentType[bt], dtmf)
 }
 
 func (ss *SipSession) stopRTPStreaming() {
@@ -332,12 +369,14 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 		goto finish1
 	}
 
-	// {
-	// 	ulaw := rtp.PCM2G711U(pcm)
-	// 	pcm = rtp.G711U2PCM(ulaw)
-	// 	alaw := rtp.PCM2G711A(pcm)
-	// 	pcm = rtp.G711A2PCM(alaw)
-	// }
+	{
+		g722 := rtp.PCM2G722(pcm)
+		pcm = rtp.G722toPCM(g722)
+		ulaw := rtp.PCM2G711U(pcm)
+		pcm = rtp.G711U2PCM(ulaw)
+		alaw := rtp.PCM2G711A(pcm)
+		pcm = rtp.G711A2PCM(alaw)
+	}
 
 	// TODO only allow ptime:20 .. i.e. 160 bytes/packet/20ms
 	{

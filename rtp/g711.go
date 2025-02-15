@@ -24,7 +24,7 @@ func PCM2G711A(data []int16) []byte {
 func G711U2PCM(frame []byte) []int16 {
 	count := len(frame)
 	if len(frame) == 0 {
-		return []int16{}
+		return nil
 	}
 	res := make([]int16, count)
 	for i, d := range frame {
@@ -36,10 +36,9 @@ func G711U2PCM(frame []byte) []int16 {
 func G711A2PCM(frame []byte) []int16 {
 	count := len(frame)
 	if count == 0 {
-		return []int16{}
+		return nil
 	}
 	res := make([]int16, count)
-
 	for i, d := range frame {
 		res[i] = alawEngine.DecompressTable[int(d&0xFF)]
 	}
