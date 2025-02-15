@@ -6,7 +6,7 @@ import (
 
 const (
 	sampleRate = 8000 // Sample rate in Hz
-	blockSize  = 320  // Block size for DTMF detection (2 RTP packets = 320 samples)
+	blockSize  = 480  // 3 RTP packets i.e. 160 x 3 = 480 bytes // Block size for DTMF detection (2 RTP packets = 320 samples)
 	threshold  = 1e5  // Power threshold for DTMF detection
 )
 

@@ -298,10 +298,11 @@ func (ss *SipSession) mediaReceiver() {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
 						ss.NewDTMF = false
 						pcm := rtp.GetPCM(ss.PCMBytes, ss.rtpPayloadType)
-						digit := rtp.DetectDTMF(pcm)
-						if digit != "" {
+						signal := rtp.DetectDTMF(pcm)
+						if signal != "" {
+							dtmf := DicDTMFEvent[DicDTMFSignal[signal]]
 							frmt := ss.LocalSDP.GetChosenMedia().FormatByPayload(ss.rtpPayloadType)
-							fmt.Printf("Inband - RTP Tone (%s) - Received: %s\n", frmt.Name, digit)
+							fmt.Printf("Inband - RTP Audio Tone (%s) - Received: %s\n", frmt.Name, dtmf)
 						}
 					} else {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
@@ -367,14 +368,14 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 		goto finish1
 	}
 
-	{
-		g722 := rtp.PCM2G722(pcm)
-		pcm = rtp.G722toPCM(g722)
-		ulaw := rtp.PCM2G711U(pcm)
-		pcm = rtp.G711U2PCM(ulaw)
-		alaw := rtp.PCM2G711A(pcm)
-		pcm = rtp.G711A2PCM(alaw)
-	}
+	// {
+	// 	g722 := rtp.PCM2G722(pcm)
+	// 	pcm = rtp.G722toPCM(g722)
+	// 	ulaw := rtp.PCM2G711U(pcm)
+	// 	pcm = rtp.G711U2PCM(ulaw)
+	// 	alaw := rtp.PCM2G711A(pcm)
+	// 	pcm = rtp.G711A2PCM(alaw)
+	// }
 
 	// TODO only allow ptime:20 .. i.e. 160 bytes/packet/20ms
 	{
