@@ -33,6 +33,12 @@ const (
 	MediaStartPort int = 7001
 	MediaEndPort   int = 57000
 
+	PacketizationTime int = 20   // ms
+	PayloadSize       int = 160  // bytes
+	SamplingFrequency int = 8000 // Hz
+	DTMFPacketsCount  int = 3
+	RTPHeadersSize    int = 12 //bytes
+
 	T1Timer              int    = 500
 	ReTXCount            int    = 5
 	MultipartBoundary    string = "unique-boundary-1"

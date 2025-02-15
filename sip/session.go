@@ -17,7 +17,6 @@ package sip
 import (
 	. "MRFGo/global"
 	"MRFGo/guid"
-	"MRFGo/rtp"
 	"MRFGo/sdp"
 	"MRFGo/sip/mode"
 	"MRFGo/sip/state"
@@ -68,7 +67,6 @@ type SipSession struct {
 	MediaListener  *net.UDPConn
 	LocalSDP       *sdp.Session
 	WithTeleEvents bool
-	Detector       *rtp.DTMFDetector
 	NewDTMF        bool
 	PCMBytes       []byte
 	IsCallHeld     bool

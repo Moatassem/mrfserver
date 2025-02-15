@@ -224,9 +224,8 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	ss.rtpPayloadType = audioFormat.Payload
 	ss.WithTeleEvents = dtmfFormat != nil
 
-	if !ss.WithTeleEvents && ss.Detector == nil {
-		ss.Detector = rtp.NewDTMFDetector(65)
-		ss.PCMBytes = make([]byte, 0, 1120)
+	if !ss.WithTeleEvents {
+		ss.PCMBytes = make([]byte, 0, DTMFPacketsCount*PayloadSize)
 	}
 
 	return
@@ -288,27 +287,26 @@ func (ss *SipSession) mediaReceiver() {
 				}
 			}
 		} else {
-			if n == 172 {
+			if n == RTPHeadersSize+PayloadSize {
 				b1 := bytes[1]
 				if b1 >= 128 {
 					ss.NewDTMF = true
 					ss.PCMBytes = ss.PCMBytes[:0]
 				} else if ss.NewDTMF {
 					payload := bytes[12:]
-					if len(ss.PCMBytes) == 6*len(payload) {
+					if len(ss.PCMBytes) == DTMFPacketsCount*len(payload) {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
 						ss.NewDTMF = false
 						pcm := rtp.GetPCM(ss.PCMBytes, ss.rtpPayloadType)
-						ss.Detector.Detect(pcm)
-						runes := ss.Detector.GetAllDTMFTones()
-						fmt.Println(runes)
-						frmt := ss.LocalSDP.GetChosenMedia().FormatByPayload(ss.rtpPayloadType)
-						fmt.Printf("Inband - RTP Tone (%s) - Received: %s\n", frmt.Name, "<>")
+						digit := rtp.DetectDTMF(pcm)
+						if digit != "" {
+							frmt := ss.LocalSDP.GetChosenMedia().FormatByPayload(ss.rtpPayloadType)
+							fmt.Printf("Inband - RTP Tone (%s) - Received: %s\n", frmt.Name, digit)
+						}
 					} else {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
 					}
 				}
-				// ss.Detector.Detect()
 			}
 		}
 		RTPRXBufferPool.Put(buf)
