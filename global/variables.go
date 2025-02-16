@@ -26,6 +26,8 @@ const (
 	EntityName = "OINIS-NSF"
 	B2BUAName  = "MRFGo/1.0"
 
+	MRFRepoName = "soso"
+
 	BufferSize int = 4096
 
 	RTPHeaderSize  int = 12
@@ -144,7 +146,7 @@ var (
 		NameAndNumber:              regexp.MustCompile(`(?i)("?[^<"]+?"?)?\s*<(?:sip|tel):([\*\#\+]?[\d\.\-]+|Invalid|Anonymous|Unavailable)@?`),
 		ReplaceNumberOnly:          regexp.MustCompile(`(?i)(.*?(?:sip|sips|tel):)(?:[\*\#\+]?[\d\.\-]+|Invalid|Anonymous|Unavailable)(.*)`),
 		RequestStartLinePattern:    regexp.MustCompile(`(?i)^\s*([a-z]+)\s+((?:\w+):(?:(?:[^@]+)@)?(?:[^@]+))\s+(SIP/2\.0)$`),
-		INVITERURI:                 regexp.MustCompile(`(?i)([a-z]+):([\*\#\+]?[a-f0-9\.\-\(\)]+)((?:[,;](?:[\w\-]+=[^@=:,;:]+|[\w\-]+))*)(:[^@]+)?@([^\*\#\+@:,;]+(?::(?:\d+))?)((?:[,;](?:[\w\-]+=[^@,;]+|[\w\-]+))*)`), // removed ^ from start >>> `(?i)^ ___ $ from the end >> ))*)$`
+		INVITERURI:                 regexp.MustCompile(`(?i)([a-z]+):([\*\#\+]?[a-z0-9\.\-\(\)]+)((?:[,;](?:[\w\-]+=[^@=:,;:]+|[\w\-]+))*)(:[^@]+)?@([^\*\#\+@:,;]+(?::(?:\d+))?)((?:[,;](?:[\w\-]+=[^@,;]+|[\w\-]+))*)`), // removed ^ from start >>> `(?i)^ ___ $ from the end >> ))*)$`
 		ResponseStartLinePattern:   regexp.MustCompile(`(?i)^\s*(SIP/2\.0)\s+(\d{3})(?:\s+([^,;]+)([,;].+)?)?$`),
 		ViaBranchPattern:           regexp.MustCompile(`(?i);branch\s*=\s*([^;,]+)`),
 		ViaTransport:               regexp.MustCompile(`(?i)SIP/2.0/(\w+)`),

@@ -40,8 +40,8 @@ func StartServer(ipv4 string, sup, htp int) *net.UDPConn {
 	fmt.Println("Ready!")
 
 	fmt.Printf("Loading files in directory: %s\n", MediaPath)
-	MRFRepos = NewMRFRepoCollection()
-	fmt.Printf("Audio files count: %d \n", MRFRepos.FilesCount())
+	MRFRepos = NewMRFRepoCollection(MRFRepoName)
+	fmt.Printf("Audio files count: %d \n", MRFRepos.FilesCount(MRFRepoName))
 
 	triedAlready := false
 tryAgain:

@@ -54,10 +54,13 @@ func (ss *SipSession) RouteRequestInternal(trans *Transaction, sipmsg1 *SipMessa
 		return
 	}
 
-	if !MRFRepos.DoesMRFRepoExist(upart) {
+	repo, ok := MRFRepos.GetMRFRepo(upart)
+	if !ok {
 		ss.RejectMe(trans, status.NotFound, q850.UnallocatedNumber, "MRF Repository not found")
 		return
 	}
+
+	ss.MRFRepo = repo
 
 	ss.answerMRF(trans, sipmsg1)
 }
@@ -378,7 +381,7 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 	origPayload := ss.rtpPayloadType
 
 	// TODO see if i can support more codecs
-	pcm, ok := MRFRepos.Get("999", afname) // TODO build repos and manage them from UI
+	pcm, ok := ss.MRFRepo.Get(afname) // TODO build repos and manage them from UI
 	if !ok {
 		fmt.Printf("Cannot find audio [%s]\n", afname) // TODO handle that in INFO
 		goto finish1
@@ -393,7 +396,6 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 	// 	pcm = rtp.G711A2PCM(alaw)
 	// }
 
-	// TODO only allow ptime:20 .. i.e. 160 bytes/packet/20ms
 	{
 		data, silence := rtp.TxPCMnSilence(pcm, ss.rtpPayloadType)
 		if data == nil {

@@ -42,6 +42,7 @@ type SipSession struct {
 	ToTag            string
 	RemoteContactURI string
 	RecordRouteURI   string
+	MRFRepo          *MRFRepo
 
 	Forsaken     bool
 	Force180Only bool

@@ -12,8 +12,7 @@ import (
 )
 
 const (
-	UPart      string  = "999"
-	sampleRate float64 = 16000
+	pcmSamplingRate float64 = 16000
 
 	ExtRaw string = "raw"
 	ExtWav string = "wav"
@@ -22,14 +21,19 @@ const (
 
 var MRFRepos *MRFRepoCollection
 
-type MRFRepoCollection struct {
+type MRFRepo struct {
 	mu   sync.RWMutex
-	maps map[string]map[string][]int16
+	data map[string][]int16
 }
 
-func NewMRFRepoCollection() *MRFRepoCollection {
+type MRFRepoCollection struct {
+	mu    sync.RWMutex
+	repos map[string]*MRFRepo
+}
+
+func NewMRFRepoCollection(rn string) *MRFRepoCollection {
 	var ivrs MRFRepoCollection
-	ivrs.maps = loadMedia()
+	ivrs.repos = loadMedia(rn)
 	return &ivrs
 }
 
@@ -49,9 +53,10 @@ func getExtension(fn string) string {
 	return global.ASCIIToLower(fn[idx+1:])
 }
 
-func loadMedia() map[string]map[string][]int16 {
-	mp := make(map[string]map[string][]int16)
-	mp[UPart] = make(map[string][]int16)
+func loadMedia(rn string) map[string]*MRFRepo {
+	mrfrepos := make(map[string]*MRFRepo)
+	mrfrepo := MRFRepo{data: make(map[string][]int16)}
+	mrfrepos[rn] = &mrfrepo
 
 	dentries, err := os.ReadDir(global.MediaPath)
 	if err != nil {
@@ -89,14 +94,14 @@ func loadMedia() map[string]map[string][]int16 {
 		}
 
 		// Calculate duration -- TODO duration not accurate vs playback duration
-		duration := float64(len(pcmBytes)) / sampleRate
+		duration := float64(len(pcmBytes)) / pcmSamplingRate
 
 		fmt.Printf("Filename: %s, Duration: %s\n", filename, formattedTime(duration))
 
-		mp[UPart][filenameonly] = pcmBytes
+		mrfrepo.data[filenameonly] = pcmBytes
 	}
 
-	return mp
+	return mrfrepos
 }
 
 func formattedTime(totsec float64) string {
@@ -109,38 +114,52 @@ func formattedTime(totsec float64) string {
 	return fmt.Sprintf("%02d:%02d.%03d", minutes, seconds, milliseconds)
 }
 
-func (mrfr *MRFRepoCollection) FilesCount() int {
+func (mrfr *MRFRepoCollection) FilesCount(up string) int {
 	mrfr.mu.RLock()
 	defer mrfr.mu.RUnlock()
-	mp, ok := mrfr.maps[UPart]
+	mp, ok := mrfr.repos[up]
 	if ok {
-		return len(mp)
+		return mp.FilesCount()
 	}
-	return 0
+	return -1
 }
 
-func (mrfr *MRFRepoCollection) DoesMRFRepoExist(upart string) bool {
-	mrfr.mu.RLock()
-	defer mrfr.mu.RUnlock()
-	_, ok := mrfr.maps[upart]
-	return ok
+func (mrfrps *MRFRepoCollection) GetMRFRepo(upart string) (*MRFRepo, bool) {
+	mrfrps.mu.RLock()
+	defer mrfrps.mu.RUnlock()
+	mrfrp, ok := mrfrps.repos[upart]
+	return mrfrp, ok
 }
 
-func (mrfr *MRFRepoCollection) Get(upart, key string) ([]int16, bool) {
-	mrfr.mu.RLock()
-	defer mrfr.mu.RUnlock()
-	if mp, ok := mrfr.maps[upart]; ok {
-		ivr, ok := mp[key]
-		if ivr == nil || len(ivr) == 0 {
-			return nil, false
-		}
-		return ivr, ok
+func (mrfrps *MRFRepoCollection) Get(upart, key string) ([]int16, bool) {
+	mrfrps.mu.RLock()
+	defer mrfrps.mu.RUnlock()
+	if mp, ok := mrfrps.repos[upart]; ok {
+		return mp.Get(key)
 	}
 	return nil, false
 }
 
-func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes []int16) {
-	mrfr.mu.Lock()
-	defer mrfr.mu.Unlock()
-	mrfr.maps[upart][key] = bytes
+func (mrfrp *MRFRepo) Get(key string) ([]int16, bool) {
+	mrfrp.mu.RLock()
+	defer mrfrp.mu.RUnlock()
+	if pcm, ok := mrfrp.data[key]; ok {
+		if pcm == nil || len(pcm) == 0 {
+			return nil, false
+		}
+		return pcm, ok
+	}
+	return nil, false
 }
+
+func (mrfrp *MRFRepo) FilesCount() int {
+	mrfrp.mu.RLock()
+	defer mrfrp.mu.RUnlock()
+	return len(mrfrp.data)
+}
+
+// func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes []int16) {
+// 	mrfr.mu.Lock()
+// 	defer mrfr.mu.Unlock()
+// 	mrfr.repos[upart][key] = bytes
+// }

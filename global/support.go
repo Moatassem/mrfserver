@@ -26,7 +26,6 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 )
 
@@ -148,9 +147,22 @@ func GetUsedSize(pdu []byte) int {
 func DropVisualSeparators(strng string) string {
 	var sb strings.Builder
 	for _, r := range strng {
-		if unicode.IsDigit(r) || r == '+' {
+		switch r {
+		case '.', '-', '(', ')':
+		default:
 			sb.WriteRune(r)
 		}
+	}
+	return sb.String()
+}
+
+func KeepOnlyNumerics(strng string) string {
+	var sb strings.Builder
+	for _, r := range strng {
+		if r < '0' || r > '9' {
+			continue
+		}
+		sb.WriteRune(r)
 	}
 	return sb.String()
 }
