@@ -252,6 +252,14 @@ func (ss *SipSession) answerMRF(trans *Transaction, sipmsg *SipMessage) {
 	ss.SDPSessionID = int64(RandomNum(1000, 9000))
 	ss.SDPSessionVersion = 1
 
+	ss.SendResponse(trans, status.Ringing, EmptyBody())
+
+	<-time.After(AnswerDelay * time.Millisecond)
+
+	if !ss.IsBeingEstablished() {
+		return
+	}
+
 	ss.SendResponse(trans, status.OK, NewMessageSDPBody(ss.LocalSDP.Bytes()))
 }
 
@@ -483,6 +491,8 @@ finish2:
 		ss.ReleaseMe("audio finished")
 	}
 }
+
+// =========================================================================================================================
 
 func bool2byte(b bool) byte {
 	if b {

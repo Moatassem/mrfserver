@@ -38,6 +38,7 @@ const (
 	SamplingRate          = 8000 // Hz
 	DTMFPacketsCount  int = 3
 	RTPHeadersSize    int = 12 //bytes
+	AnswerDelay           = 20 //ms
 
 	T1Timer              int    = 500
 	ReTXCount            int    = 5
