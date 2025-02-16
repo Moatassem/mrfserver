@@ -46,7 +46,7 @@ type SipSession struct {
 	Forsaken     bool
 	Force180Only bool
 
-	Mymode mode.SessionMode
+	Mode mode.SessionMode
 
 	dcmutex          sync.RWMutex
 	dialogueChanging bool
@@ -84,15 +84,11 @@ type SipSession struct {
 	BwdCSeq uint32
 	RSeq    uint32
 
-	RemoteBody        MessageBody //to save incoming body if SDP is included
-	SDPHashValue      string
 	SDPSessionID      int64
 	SDPSessionVersion int64
 
 	IsDisposed    bool
 	multiUseMutex sync.Mutex // used for synchronizing no18x & noAns timers, probing & max duration, dropping session
-	no18xSTimer   *SipTimer
-	noAnsSTimer   *SipTimer
 
 	maxDurationTimer *time.Timer  //used on inbound sessions only
 	probingTicker    *time.Ticker //used on inbound sessions only
@@ -117,7 +113,7 @@ func NewSIPSession(sipmsg *SipMessage) *SipSession { //used in inbound sessions
 	return ss
 }
 func (session *SipSession) String() string {
-	return fmt.Sprintf("Call-ID: %s, State: %s, Direction: %s, Mode: %s", session.CallID, session.state.String(), session.Direction.String(), session.Mymode)
+	return fmt.Sprintf("Call-ID: %s, State: %s, Direction: %s, Mode: %s", session.CallID, session.state.String(), session.Direction.String(), session.Mode)
 }
 
 //============================================================
@@ -376,9 +372,9 @@ func (session *SipSession) CreateSARequest(rqstpk RequestPack, body MessageBody)
 	switch rqstpk.Method {
 	case OPTIONS:
 		session.FwdCSeq = 911
-		session.Mymode = mode.KeepAlive
+		session.Mode = mode.KeepAlive
 	case INVITE:
-		session.Mymode = mode.Multimedia
+		session.Mode = mode.Multimedia
 		fallthrough
 	default: // Any other
 		session.FwdCSeq = uint32(RandomNum(1, 500))
@@ -953,12 +949,12 @@ func CheckPendingTransaction(ss *SipSession, tx *Transaction) {
 	// TODO: incomplete!!!
 	switch tx.Method {
 	case OPTIONS:
-		if ss.Mymode == mode.KeepAlive {
+		if ss.Mode == mode.KeepAlive {
 			ss.SetState(state.TimedOut)
 			ss.DropMe()
 			return
 		}
-		if ss.Mymode == mode.Multimedia && ss.Direction == INBOUND && tx.Direction == OUTBOUND && tx.IsProbing { //means my in-dialogue probing OPTIONS
+		if ss.Mode == mode.Multimedia && ss.Direction == INBOUND && tx.Direction == OUTBOUND && tx.IsProbing { //means my in-dialogue probing OPTIONS
 			ss.ReleaseMe("Probing timed-out")
 		}
 	case INVITE:

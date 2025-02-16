@@ -18,6 +18,7 @@ import (
 	. "MRFGo/global"
 	"MRFGo/q850"
 	"MRFGo/rtp"
+	"MRFGo/rtp/dtmf"
 	"MRFGo/sdp"
 	"MRFGo/sip/state"
 	"MRFGo/sip/status"
@@ -305,7 +306,7 @@ func (ss *SipSession) mediaReceiver() {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
 						ss.NewDTMF = false
 						pcm := rtp.GetPCM(ss.PCMBytes, ss.rtpPayloadType)
-						signal := rtp.DetectDTMF(pcm)
+						signal := dtmf.DetectDTMF(pcm)
 						if signal != "" {
 							dtmf := DicDTMFEvent[DicDTMFSignal[signal]]
 							frmt := ss.LocalSDP.GetChosenMedia().FormatByPayload(ss.rtpPayloadType)

@@ -16,6 +16,7 @@ package global
 
 import (
 	"MRFGo/rtp"
+	"MRFGo/rtp/dtmf"
 	"encoding/binary"
 	"sync"
 )
@@ -31,6 +32,7 @@ func InitializeEngine() {
 
 	IsSystemBigEndian = checkSystemIndian()
 	rtp.InitializeTX()
+	dtmf.Initialize(SamplingRate)
 }
 
 func newSyncPool(bsz, csz int) *sync.Pool {

@@ -323,7 +323,7 @@ func sessionGetter(sipmsg *SipMessage) (*SipSession, NewSessionType) {
 		if sipmsg.ToTag == "" {
 			switch sipmsg.GetMethod() {
 			case INVITE:
-				sipses.Mymode = mode.Multimedia
+				sipses.Mode = mode.Multimedia
 				sipses.IsPRACKSupported = sipmsg.IsOptionSupported("100rel")
 				sipses.IsDelayedOfferCall = !sipmsg.Body.ContainsSDP()
 				sipses.SetState(state.BeingEstablished)
@@ -344,16 +344,16 @@ func sessionGetter(sipmsg *SipMessage) (*SipSession, NewSessionType) {
 				}
 				return sipses, ValidRequest
 			case MESSAGE:
-				sipses.Mymode = mode.Messaging
+				sipses.Mode = mode.Messaging
 				return sipses, ValidRequest
 			case SUBSCRIBE:
-				sipses.Mymode = mode.Subscription
+				sipses.Mode = mode.Subscription
 				return sipses, ValidRequest
 			case OPTIONS:
-				sipses.Mymode = mode.KeepAlive
+				sipses.Mode = mode.KeepAlive
 				return sipses, ValidRequest
 			case REGISTER:
-				sipses.Mymode = mode.Registration
+				sipses.Mode = mode.Registration
 				return sipses, ValidRequest
 			case REFER, NOTIFY, UPDATE, PRACK, INFO, PUBLISH, NEGOTIATE:
 				return sipses, InvalidRequest
@@ -544,7 +544,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			switch trans.Method {
 			case INFO:
 			case OPTIONS: //probing or keepalive
-				if ss.Mymode == mode.KeepAlive {
+				if ss.Mode == mode.KeepAlive {
 					ss.FinalizeState()
 					ss.RemoteUserAgent.IsAlive = true
 					ss.DropMe()
@@ -558,7 +558,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 		default: // 400-699
 			switch trans.Method {
 			case OPTIONS: //probing or keepalive
-				if ss.Mymode == mode.KeepAlive {
+				if ss.Mode == mode.KeepAlive {
 					ss.FinalizeState()
 					ss.DropMe()
 				}

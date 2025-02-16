@@ -1,13 +1,12 @@
-package rtp
+package dtmf
 
 import (
 	"math"
 )
 
 const (
-	sampleRate = 8000 // Sample rate in Hz
-	blockSize  = 480  // 3 RTP packets i.e. 160 x 3 = 480 bytes // Block size for DTMF detection (2 RTP packets = 320 samples)
-	threshold  = 1e5  // Power threshold for DTMF detection
+	// blockSize  = 480  // 3 RTP packets i.e. 160 x 3 = 480 bytes // Block size for DTMF detection (2 RTP packets = 320 samples)
+	threshold = 1e5 // Power threshold for DTMF detection
 )
 
 var (
@@ -21,11 +20,11 @@ var (
 	coefficients []float64 // Precomputed coefficients for Goertzel algorithm
 )
 
-func init() {
+func Initialize(sr float64) {
 	// Precompute coefficients for each DTMF frequency
 	coefficients = make([]float64, len(dtmfFrequencies))
 	for i, freq := range dtmfFrequencies {
-		normalizedFreq := freq / sampleRate
+		normalizedFreq := freq / sr
 		coefficients[i] = 2.0 * math.Cos(2.0*math.Pi*normalizedFreq)
 	}
 }

@@ -35,7 +35,7 @@ const (
 
 	PacketizationTime int = 20   // ms
 	PayloadSize       int = 160  // bytes
-	SamplingFrequency int = 8000 // Hz
+	SamplingRate          = 8000 // Hz
 	DTMFPacketsCount  int = 3
 	RTPHeadersSize    int = 12 //bytes
 
