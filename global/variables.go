@@ -26,7 +26,7 @@ const (
 	EntityName = "OINIS-NSF"
 	B2BUAName  = "MRFGo/1.0"
 
-	MRFRepoName = "soso"
+	MRFRepoName = "ivr"
 
 	BufferSize int = 4096
 
