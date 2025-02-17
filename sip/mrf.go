@@ -82,7 +82,7 @@ func (ss *SipSession) buildSDPAnswer(sipmsg *SipMessage) (sipcode, q850code int,
 	var dtmfFormat *sdp.Format
 	for i := 0; i < len(sdpses.Media); i++ {
 		media = sdpses.Media[i]
-		if media.Type != "audio" || media.Port == 0 || media.Proto != "RTP/AVP" || conn == nil && len(media.Connection) == 0 { //|| media.Mode != sdp.SendRecv
+		if media.Type != sdp.Audio || media.Port == 0 || media.Proto != sdp.RtpAvp || conn == nil && len(media.Connection) == 0 { //|| media.Mode != sdp.SendRecv
 			continue
 		}
 		for j := 0; j < len(media.Connection); j++ {

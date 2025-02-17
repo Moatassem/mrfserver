@@ -74,8 +74,7 @@ func (s *Session) GetEffectivePTime() string {
 // 	return ""
 // }
 
-func (s *Session) GetEffectiveConnection() string {
-	media := s.GetChosenMedia()
+func (s *Session) GetEffectiveConnection(media *Media) string {
 	var ipv4 string
 	for i := 0; i < len(media.Connection); i++ {
 		ipv4 = media.Connection[i].Address
@@ -84,6 +83,16 @@ func (s *Session) GetEffectiveConnection() string {
 		}
 	}
 	return s.Connection.Address
+}
+
+func (s *Session) IsT38Image() bool {
+	for i := 0; i < len(s.Media); i++ {
+		media := s.Media[i]
+		if media.Type == Image && media.Port > 0 && media.Proto == Udptl && media.FormatDescr == "t38" {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Session) GetEffectiveMediaDirective() string {
@@ -110,7 +119,7 @@ func (s *Session) IsCallHeld() bool {
 	if mode == SendOnly || mode == Inactive {
 		return true
 	}
-	if ipv4 := s.GetEffectiveConnection(); ipv4 == "" || ipv4 == "0.0.0.0" {
+	if ipv4 := s.GetEffectiveConnection(media); ipv4 == "" || ipv4 == "0.0.0.0" {
 		return true
 	}
 	return false
@@ -198,6 +207,66 @@ const (
 	SendOnly = "sendonly"
 	RecvOnly = "recvonly"
 	Inactive = "inactive"
+
+	Audio       = "audio"       //[RFC8866]
+	Video       = "video"       //[RFC8866]
+	Text        = "text"        //[RFC8866]
+	Application = "application" //[RFC8866]
+	Message     = "message"     //[RFC8866]
+	Image       = "image"       //[RFC6466]
+
+	RtpAvp            = "RTP/AVP"               // [RFC8866]
+	Udp               = "udp"                   // [RFC8866]
+	Vat               = "vat"                   // [1]
+	Rtp               = "rtp"                   // [1]
+	Udptl             = "udptl"                 // [ITU-T Recommendation T.38, 'Procedures for real-time Group 3 facsimile communication over IP networks', June 1998. (Section 9)]
+	Tcp               = "TCP"                   // [RFC4145]
+	RtpAvpf           = "RTP/AVPF"              // [RFC4585]
+	TcpRtpAvp         = "TCP/RTP/AVP"           // [RFC4571]
+	RtpSavp           = "RTP/SAVP"              // [RFC3711]
+	TcpBfcp           = "TCP/BFCP"              // [RFC8856]
+	TcpTlsBfcp        = "TCP/TLS/BFCP"          // [RFC8856]
+	TcpTls            = "TCP/TLS"               // [RFC8122]
+	FluteUdp          = "FLUTE/UDP"             // [RFC-mehta-rmt-flute-sdp-05]
+	TcpMsrp           = "TCP/MSRP"              // [RFC4975]
+	TcpTlsMsrp        = "TCP/TLS/MSRP"          // [RFC4975]
+	Dccp              = "DCCP"                  // [RFC5762]
+	DccpRtpAvp        = "DCCP/RTP/AVP"          // [RFC5762]
+	DccpRtpSavp       = "DCCP/RTP/SAVP"         // [RFC5762]
+	DccpRtpAvpf       = "DCCP/RTP/AVPF"         // [RFC5762]
+	DccpRtpSavpf      = "DCCP/RTP/SAVPF"        // [RFC5762]
+	RtpSavpf          = "RTP/SAVPF"             // [RFC5124]
+	UdpTlsRtpSavp     = "UDP/TLS/RTP/SAVP"      // [RFC5764]
+	DccpTlsRtpSavp    = "DCCP/TLS/RTP/SAVP"     // [RFC5764]
+	UdpTlsRtpSavpf    = "UDP/TLS/RTP/SAVPF"     // [RFC5764]
+	DccpTlsRtpSavpf   = "DCCP/TLS/RTP/SAVPF"    // [RFC5764]
+	UdpMbmsFecRtpAvp  = "UDP/MBMS-FEC/RTP/AVP"  // [RFC6064]
+	UdpMbmsFecRtpSavp = "UDP/MBMS-FEC/RTP/SAVP" // [RFC6064]
+	UdpMbmsRepair     = "UDP/MBMS-REPAIR"       // [RFC6064]
+	FecUdp            = "FEC/UDP"               // [RFC6364]
+	UdpFec            = "UDP/FEC"               // [RFC6364]
+	TcpMrcpv2         = "TCP/MRCPv2"            // [RFC6787]
+	TcpTlsMrcpv2      = "TCP/TLS/MRCPv2"        // [RFC6787]
+	Pstn              = "PSTN"                  // [RFC7195]
+	UdpTlsUdptl       = "UDP/TLS/UDPTL"         // [RFC7345]
+	Voice             = "voice"                 // [RFC2848]
+	Fax               = "fax"                   // [RFC2848]
+	Pager             = "pager"                 // [RFC2848]
+	TcpRtpAvpf        = "TCP/RTP/AVPF"          // [RFC7850]
+	TcpRtpSavp        = "TCP/RTP/SAVP"          // [RFC7850]
+	TcpRtpSavpf       = "TCP/RTP/SAVPF"         // [RFC7850]
+	TcpDtlsRtpSavp    = "TCP/DTLS/RTP/SAVP"     // [RFC7850]
+	TcpDtlsRtpSavpf   = "TCP/DTLS/RTP/SAVPF"    // [RFC7850]
+	TcpTlsRtpAvp      = "TCP/TLS/RTP/AVP"       // [RFC7850]
+	TcpTlsRtpAvpf     = "TCP/TLS/RTP/AVPF"      // [RFC7850]
+	TcpWsBfcp         = "TCP/WS/BFCP"           // [RFC8857]
+	TcpWssBfcp        = "TCP/WSS/BFCP"          // [RFC8857]
+	UdpDtlsSctp       = "UDP/DTLS/SCTP"         // [RFC8841]
+	TcpDtlsSctp       = "TCP/DTLS/SCTP"         // [RFC8841]
+	TcpDtlsBfcp       = "TCP/DTLS/BFCP"         // [RFC8856]
+	UdpBfcp           = "UDP/BFCP"              // [RFC8856]
+	UdpTlsBfcp        = "UDP/TLS/BFCP"          // [RFC8856]
+
 )
 
 // NegotiateMode negotiates streaming mode.

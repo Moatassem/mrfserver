@@ -78,6 +78,8 @@ func maxIndex(power []float64) int {
 	return maxIndex
 }
 
+// TODO create DTMF Generator using the below
+
 // func main() {
 // 	// Example PCM data (replace with actual PCM data)
 // 	pcmData := make([]int16, blockSize)

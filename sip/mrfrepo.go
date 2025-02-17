@@ -12,8 +12,6 @@ import (
 )
 
 const (
-	pcmSamplingRate float64 = 16000
-
 	ExtRaw string = "raw"
 	ExtWav string = "wav"
 	ExtMp3 string = "mp3"
@@ -94,7 +92,7 @@ func loadMedia(rn string) map[string]*MRFRepo {
 		}
 
 		// Calculate duration -- TODO duration not accurate vs playback duration
-		duration := float64(len(pcmBytes)) / pcmSamplingRate
+		duration := float64(len(pcmBytes)) / global.PcmSamplingRate
 
 		fmt.Printf("Filename: %s, Duration: %s\n", filename, formattedTime(duration))
 
