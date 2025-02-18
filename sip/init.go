@@ -16,7 +16,7 @@ package sip
 
 import (
 	"MRFGo/cl"
-	. "MRFGo/global"
+	"MRFGo/global"
 	"fmt"
 	"log"
 	"net"
@@ -33,20 +33,20 @@ func StartServer(ipv4 string, sup, htp int) *net.UDPConn {
 	fmt.Print("Initializing Global Parameters...")
 	Sessions = NewConcurrentMapMutex()
 
-	SipUdpPort = sup
-	HttpTcpPort = htp
+	global.SipUdpPort = sup
+	global.HttpTcpPort = htp
 
-	InitializeEngine()
+	global.InitializeEngine()
 	fmt.Println("Ready!")
 
-	fmt.Printf("Loading files in directory: %s\n", MediaPath)
-	MRFRepos = NewMRFRepoCollection(MRFRepoName)
-	fmt.Printf("Audio files count: %d \n", MRFRepos.FilesCount(MRFRepoName))
+	fmt.Printf("Loading files in directory: %s\n", global.MediaPath)
+	MRFRepos = NewMRFRepoCollection(global.MRFRepoName)
+	fmt.Printf("Audio files count: %d \n", MRFRepos.FilesCount(global.MRFRepoName))
 
 	triedAlready := false
 tryAgain:
 	fmt.Print("Attempting to listen on SIP...")
-	serverUDPListener, err := StartListening(ServerIPv4, SipUdpPort)
+	serverUDPListener, err := global.StartListening(global.ServerIPv4, global.SipUdpPort)
 	if err != nil {
 		if triedAlready {
 			fmt.Println(err)
@@ -54,7 +54,7 @@ tryAgain:
 		}
 		fmt.Printf("Error: %s\n", err)
 		if opErr, ok := err.(*net.OpError); ok && strings.Contains(opErr.Error(), "bind") {
-			ServerIPv4 = getlocalIPv4()
+			global.ServerIPv4 = getlocalIPv4()
 			triedAlready = true
 			goto tryAgain
 		}
@@ -66,15 +66,15 @@ tryAgain:
 	fmt.Println("Success: UDP", serverUDPListener.LocalAddr().String())
 
 	fmt.Print("Setting Rate Limiter...")
-	CallLimiter = cl.NewCallLimiter(RateLimit, Prometrics, &WtGrp)
-	fmt.Printf("OK (%d)\n", RateLimit)
+	global.CallLimiter = cl.NewCallLimiter(global.RateLimit, global.Prometrics, &global.WtGrp)
+	fmt.Printf("OK (%d)\n", global.RateLimit)
 
 	return serverUDPListener
 }
 
 func getlocalIPv4() net.IP {
 	fmt.Print("Checking Interfaces...")
-	serverIPs, err := GetLocalIPs()
+	serverIPs, err := global.GetLocalIPs()
 	if err != nil {
 		fmt.Println("Failed to find an IPv4 interface:", err)
 		os.Exit(1)
@@ -121,31 +121,31 @@ var (
 
 type Packet struct {
 	sourceAddr *net.UDPAddr
-	buffer     []byte
+	buffer     *[]byte
 	bytesCount int
 }
 
 func startWorkers(conn *net.UDPConn) {
 	// Start worker pool
-	WtGrp.Add(WorkerCount)
+	global.WtGrp.Add(WorkerCount)
 	for i := 0; i < WorkerCount; i++ {
 		go worker(i, conn, packetQueue)
 	}
 }
 
 func udpLoopWorkers(conn *net.UDPConn) {
-	WtGrp.Add(1)
+	global.WtGrp.Add(1)
 	defer func() {
-		WtGrp.Done()
+		global.WtGrp.Done()
 		if r := recover(); r != nil {
-			LogCallStack(r)
+			global.LogCallStack(r)
 			udpLoopWorkers(conn)
 		}
 	}()
 	go func() {
 		for {
-			buf := BufferPool.Get().([]byte)
-			n, addr, err := conn.ReadFromUDP(buf)
+			buf := global.BufferPool.Get().(*[]byte)
+			n, addr, err := conn.ReadFromUDP(*buf)
 			if err != nil {
 				fmt.Println(err)
 				continue
@@ -157,7 +157,7 @@ func udpLoopWorkers(conn *net.UDPConn) {
 }
 
 func worker(id int, conn *net.UDPConn, queue <-chan Packet) {
-	defer WtGrp.Done()
+	defer global.WtGrp.Done()
 	for packet := range queue {
 		// TODO use the id to log the worker id
 		_ = id
@@ -167,7 +167,7 @@ func worker(id int, conn *net.UDPConn, queue <-chan Packet) {
 }
 
 func processPacket(packet Packet, conn *net.UDPConn) {
-	pdu := packet.buffer[:packet.bytesCount]
+	pdu := (*packet.buffer)[:packet.bytesCount]
 	for {
 		if len(pdu) == 0 {
 			break
@@ -188,5 +188,5 @@ func processPacket(packet Packet, conn *net.UDPConn) {
 		sipStack(msg, ss, newSesType)
 		pdu = pdutmp
 	}
-	BufferPool.Put(packet.buffer)
+	global.BufferPool.Put(packet.buffer)
 }

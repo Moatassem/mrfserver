@@ -15,7 +15,7 @@
 package sip
 
 import (
-	. "MRFGo/global"
+	"MRFGo/global"
 	"MRFGo/guid"
 	"fmt"
 	"sync"
@@ -24,8 +24,8 @@ import (
 
 type Transaction struct {
 	Key       string
-	Direction Direction
-	Method    Method
+	Direction global.Direction
+	Method    global.Method
 	CSeq      uint32
 	RSeq      uint32
 
@@ -34,7 +34,7 @@ type Transaction struct {
 	ViaBranch string
 	RAck      string
 
-	PrackStatus PRACKStatus
+	PrackStatus global.PRACKStatus
 
 	IsACKed     bool
 	IsFinalized bool
@@ -53,8 +53,8 @@ type Transaction struct {
 	SentMessage *SipMessage
 
 	TransTime      time.Time
-	Timer          *SipTimer
-	CANCELAuxTimer *SipTimer
+	Timer          *global.SipTimer
+	CANCELAuxTimer *global.SipTimer
 
 	//retransmission
 	ReTXCount    int
@@ -74,7 +74,7 @@ func NewSIPTransaction_RT(RM *SipMessage, LT *Transaction, ss *SipSession) *Tran
 	trans := NewST()
 	trans.Method = RM.StartLine.Method
 	trans.RequestMessage = RM
-	trans.Direction = INBOUND
+	trans.Direction = global.INBOUND
 	trans.CSeq = RM.CSeqNum
 	trans.ViaBranch = RM.ViaBranch
 	trans.LinkedTransaction = LT
@@ -84,10 +84,10 @@ func NewSIPTransaction_RT(RM *SipMessage, LT *Transaction, ss *SipSession) *Tran
 	return trans
 }
 
-func NewSIPTransaction_RP(rseq uint32, prksts PRACKStatus) *Transaction {
+func NewSIPTransaction_RP(rseq uint32, prksts global.PRACKStatus) *Transaction {
 	trans := NewST()
-	trans.Direction = INBOUND
-	trans.Method = PRACK
+	trans.Direction = global.INBOUND
+	trans.Method = global.PRACK
 	trans.RSeq = rseq
 	trans.PrackStatus = prksts
 	return trans
@@ -96,21 +96,21 @@ func NewSIPTransaction_RP(rseq uint32, prksts PRACKStatus) *Transaction {
 func NewSIPTransaction_RC(rseq uint32, cseq string) *Transaction {
 	trans := NewST()
 	trans.RSeq = rseq
-	trans.Direction = OUTBOUND
-	trans.Method = PRACK
+	trans.Direction = global.OUTBOUND
+	trans.Method = global.PRACK
 	trans.ViaBranch = guid.NewViaBranch()
 	trans.RAck = fmt.Sprintf("%v %v", rseq, cseq)
 	return trans
 }
 
-func NewSIPTransaction_CRL(cq uint32, method Method, LT *Transaction) *Transaction {
+func NewSIPTransaction_CRL(cq uint32, method global.Method, LT *Transaction) *Transaction {
 	trans := NewST()
-	trans.Direction = OUTBOUND
+	trans.Direction = global.OUTBOUND
 	trans.Method = method
 	trans.CSeq = cq
 	trans.LinkedTransaction = LT
 	trans.ViaBranch = guid.NewViaBranch()
-	if LT != nil && method != ACK && method != CANCEL {
+	if LT != nil && method != global.ACK && method != global.CANCEL {
 		LT.LinkedTransaction = trans
 	}
 	return trans
@@ -131,7 +131,7 @@ func (transaction *Transaction) AnyResponseSYNC(fltr func(sc int) bool) bool {
 }
 
 func (transaction *Transaction) RequireSameViaBranch() bool {
-	return transaction.AnyResponseSYNC(IsNegative)
+	return transaction.AnyResponseSYNC(global.IsNegative)
 }
 
 func (transaction *Transaction) StatusCodeExistsSYNC(sc int) bool {
@@ -139,11 +139,11 @@ func (transaction *Transaction) StatusCodeExistsSYNC(sc int) bool {
 }
 
 func (transaction *Transaction) Any1xxSYNC() bool {
-	return transaction.AnyResponseSYNC(IsProvisional)
+	return transaction.AnyResponseSYNC(global.IsProvisional)
 }
 
 func (transaction *Transaction) IsFinalResponsePositiveSYNC() bool {
-	return transaction.AnyResponseSYNC(IsPositive)
+	return transaction.AnyResponseSYNC(global.IsPositive)
 }
 
 // ==================================================================
@@ -152,8 +152,8 @@ func (transaction *Transaction) IsFinalResponsePositiveSYNC() bool {
 func (trans *Transaction) CreateCANCELST() *Transaction {
 	// Create a new SIPTransaction for the CANCEL request
 	st := &Transaction{
-		Direction:         OUTBOUND,
-		Method:            CANCEL,
+		Direction:         global.OUTBOUND,
+		Method:            global.CANCEL,
 		CSeq:              trans.CSeq,
 		LinkedTransaction: trans,
 		To:                trans.To,
@@ -169,8 +169,8 @@ func (trans *Transaction) CreateCANCELST() *Transaction {
 func (transaction *Transaction) CreateACKST() *Transaction {
 	// Create a new SIPTransaction for the ACK
 	st := &Transaction{
-		Method:            ACK,
-		Direction:         OUTBOUND,
+		Method:            global.ACK,
+		Direction:         global.OUTBOUND,
 		CSeq:              transaction.CSeq,
 		LinkedTransaction: transaction,
 		Lock:              &sync.RWMutex{},
@@ -194,8 +194,8 @@ func (transaction *Transaction) CreateACKST() *Transaction {
 func (transaction *Transaction) StartTransTimer(sipSes *SipSession) {
 	if transaction.Timer == nil {
 		transaction.ReTXCount = 0
-		transaction.TransTimeOut = time.Duration(T1Timer) * time.Millisecond
-		transaction.Timer = &SipTimer{
+		transaction.TransTimeOut = time.Duration(global.T1Timer) * time.Millisecond
+		transaction.Timer = &global.SipTimer{
 			DoneCh: make(chan bool),
 			Tmr:    time.NewTimer(transaction.TransTimeOut),
 		}
@@ -229,7 +229,7 @@ func (transaction *Transaction) TransTimerHandler(sipSes *SipSession) {
 	}
 	transaction.Lock.Lock()
 	defer transaction.Lock.Unlock()
-	if transaction.ReTXCount >= ReTXCount {
+	if transaction.ReTXCount >= global.ReTXCount {
 		close(transaction.Timer.DoneCh)
 		transaction.Timer = nil
 		CheckPendingTransaction(sipSes, transaction)
@@ -244,9 +244,9 @@ func (transaction *Transaction) TransTimerHandler(sipSes *SipSession) {
 // ==============================================================================
 func (transaction *Transaction) StartCancelTimer(sipSes *SipSession) {
 	if transaction.CANCELAuxTimer == nil {
-		transaction.CANCELAuxTimer = &SipTimer{
+		transaction.CANCELAuxTimer = &global.SipTimer{
 			DoneCh: make(chan bool),
-			Tmr:    time.NewTimer(20 * time.Duration(T1Timer) * time.Millisecond),
+			Tmr:    time.NewTimer(20 * time.Duration(global.T1Timer) * time.Millisecond),
 		}
 		go transaction.CancelTimerHandler(sipSes)
 	}

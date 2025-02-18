@@ -385,6 +385,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 	} else {
 		trans = ss.AddIncomingResponse(sipmsg)
 	}
+
 	if trans == nil {
 		ss.DropMe()
 		return
@@ -463,11 +464,12 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.StartMaxCallDuration()
 				ss.StartInDialogueProbing()
 				go ss.mediaReceiver()
-				go ss.startRTPStreaming("Mayserreem", false, false, false)
+				// pcmbytes, _ := ss.MRFRepo.Get("CarelessWhisper")
+				// go ss.startRTPStreaming(pcmbytes, false, false, false)
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)
-					go ss.startRTPStreaming("ErsemAlb", false, true, true)
+					// go ss.startRTPStreaming("ErsemAlb", false, true, true)
 				}
 			}
 		case CANCEL:
@@ -523,10 +525,11 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 			switch btype {
 			case DTMF, DTMFRelay:
 				ss.parseDTMF(bytes, method, btype)
-			case MSCXML: // TODO handle this to get MSCL
-
+				ss.SendResponse(trans, status.OK, EmptyBody())
+			case MSCXML:
+				sc, wr := ss.parseXMLnPlay(bytes, btype)
+				ss.SendResponseDetailed(trans, NewResponsePackWarning(sc, wr), EmptyBody())
 			}
-			ss.SendResponse(trans, status.OK, EmptyBody())
 		default: //REFER, REGISTER, SUBSCRIBE, MESSAGE, PUBLISH, NEGOTIATE
 			ss.SetState(state.Dropped)
 			ss.SendResponse(trans, status.MethodNotAllowed, EmptyBody())

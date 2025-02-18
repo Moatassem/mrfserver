@@ -15,12 +15,12 @@
 package sip
 
 import (
-	. "MRFGo/global"
+	"MRFGo/global"
 )
 
 type MessageBody struct {
-	PartsContents map[BodyType]ContentPart //used to store incoming/outgoing body parts
-	MessageBytes  []byte                   //used to store the generated body bytes for sending msgs
+	PartsContents map[global.BodyType]ContentPart //used to store incoming/outgoing body parts
+	MessageBytes  []byte                          //used to store the generated body bytes for sending msgs
 }
 
 type ContentPart struct {
@@ -35,43 +35,35 @@ func EmptyBody() MessageBody {
 
 func NewMessageBody(init bool) *MessageBody {
 	if init {
-		return &MessageBody{PartsContents: make(map[BodyType]ContentPart)}
+		return &MessageBody{PartsContents: make(map[global.BodyType]ContentPart)}
 	}
 	return new(MessageBody)
 }
 
 func NewMessageSDPBody(sdpbytes []byte) MessageBody {
-	mb := MessageBody{PartsContents: make(map[BodyType]ContentPart)}
-	mb.PartsContents[SDP] = ContentPart{Bytes: sdpbytes}
-	return mb
+	// mb := MessageBody{PartsContents: make(map[BodyType]ContentPart)}
+	// mb.PartsContents[SDP] = ContentPart{Bytes: sdpbytes}
+	// return mb
+	return MessageBody{PartsContents: map[global.BodyType]ContentPart{global.SDP: {Bytes: []byte(sdpbytes)}}}
 }
 
-func NewContentPart(bt BodyType, bytes []byte) ContentPart {
+func NewContentPart(bt global.BodyType, bytes []byte) ContentPart {
 	var ct ContentPart
 	ct.Bytes = bytes
 	ct.Headers = NewSipHeaders()
-	ct.Headers.AddHeader(Content_Type, DicBodyContentType[bt])
+	ct.Headers.AddHeader(global.Content_Type, global.DicBodyContentType[bt])
 	return ct
 }
 
 // ===============================================================
 
-func NewMSCXML(xml string) MessageBody {
-	hdrs := NewSipHeaders()
-	hdrs.AddHeader(Content_Length, DicBodyContentType[MSCXML])
-	return MessageBody{PartsContents: map[BodyType]ContentPart{MSCXML: {hdrs, []byte(xml)}}}
-}
-
-func NewJSON(jsonbytes []byte) MessageBody {
-	hdrs := NewSipHeaders()
-	hdrs.AddHeader(Content_Length, DicBodyContentType[AppJson])
-	return MessageBody{PartsContents: map[BodyType]ContentPart{AppJson: {hdrs, jsonbytes}}}
-}
-
-func NewInData(binbytes []byte) MessageBody {
-	hdrs := NewSipHeaders()
-	hdrs.AddHeader(Content_Length, DicBodyContentType[VndOrangeInData])
-	return MessageBody{PartsContents: map[BodyType]ContentPart{AppJson: {hdrs, binbytes}}}
+func NewMSCXML(xml []byte) MessageBody {
+	// if aspart {
+	// 	hdrs := NewSipHeaders()
+	// 	hdrs.AddHeader(Content_Length, DicBodyContentType[MSCXML])
+	// 	return MessageBody{PartsContents: map[BodyType]ContentPart{MSCXML: {hdrs, []byte(xml)}}}
+	// }
+	return MessageBody{PartsContents: map[global.BodyType]ContentPart{global.MSCXML: {Bytes: xml}}}
 }
 
 // ===============================================================
@@ -88,7 +80,7 @@ func (messagebody *MessageBody) WithUnknownBodyPart() bool {
 		return true
 	}
 	for k := range messagebody.PartsContents {
-		if k == Unknown {
+		if k == global.Unknown {
 			return true
 		}
 	}
@@ -106,7 +98,7 @@ func (messagebody *MessageBody) ContainsSDP() bool {
 	if messagebody.WithNoBody() {
 		return false
 	}
-	_, ok := messagebody.PartsContents[SDP]
+	_, ok := messagebody.PartsContents[global.SDP]
 	return ok
 }
 
@@ -114,7 +106,7 @@ func (messagebody *MessageBody) IsJSON() bool {
 	if messagebody.WithNoBody() {
 		return false
 	}
-	_, ok := messagebody.PartsContents[AppJson]
+	_, ok := messagebody.PartsContents[global.AppJson]
 	return ok
 }
 

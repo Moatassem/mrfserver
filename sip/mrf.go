@@ -15,10 +15,10 @@
 package sip
 
 import (
+	"MRFGo/dtmf"
 	. "MRFGo/global"
 	"MRFGo/q850"
 	"MRFGo/rtp"
-	"MRFGo/rtp/dtmf"
 	"MRFGo/sdp"
 	"MRFGo/sip/state"
 	"MRFGo/sip/status"
@@ -31,14 +31,6 @@ import (
 	"strings"
 	"time"
 )
-
-func getURIUsername(uri string) string {
-	var mtch []string
-	if RMatch(uri, NumberOnly, &mtch) {
-		return mtch[1]
-	}
-	return ""
-}
 
 func (ss *SipSession) RouteRequestInternal(trans *Transaction, sipmsg1 *SipMessage) {
 	defer func() {
@@ -271,8 +263,8 @@ func (ss *SipSession) mediaReceiver() {
 		if ss.MediaListener == nil {
 			return
 		}
-		buf := RTPRXBufferPool.Get().([]byte)
-		n, addr, err := ss.MediaListener.ReadFromUDP(buf)
+		buf := RTPRXBufferPool.Get().(*[]byte)
+		n, addr, err := ss.MediaListener.ReadFromUDP(*buf)
 		if err != nil {
 			if buf != nil {
 				RTPRXBufferPool.Put(buf)
@@ -284,7 +276,7 @@ func (ss *SipSession) mediaReceiver() {
 			fmt.Println(err)
 			continue
 		}
-		bytes := buf[:n]
+		bytes := (*buf)[:n]
 
 		if !AreUAddrsEqual(addr, ss.RemoteMedia) {
 			fmt.Println("Received RTP from unknown remote connection")
@@ -296,13 +288,13 @@ func (ss *SipSession) mediaReceiver() {
 				if ss.rtpRFC4733TS != ts {
 					ss.rtpRFC4733TS = ts
 					dtmf := DicDTMFEvent[bytes[12]]
-					fmt.Printf("Inband - telephone-event (RFC 4733) - Received: %s\n", dtmf)
-					switch dtmf {
-					case "DTMF #":
-						// ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
-					case "DTMF *":
+					ss.processDTMF(dtmf, "Inband - RTP Telephone Event (RFC 4733) - Received: ")
+					// switch dtmf {
+					// case "DTMF #":
+					// 	// ss.stopRTPStreaming() // TODO use this if audiofile can be interrupted by any DTMF or a specific DTMF or not at all
+					// case "DTMF *":
 
-					}
+					// }
 				}
 			}
 		} else {
@@ -321,7 +313,7 @@ func (ss *SipSession) mediaReceiver() {
 						if signal != "" {
 							dtmf := DicDTMFEvent[DicDTMFSignal[signal]]
 							frmt := ss.LocalSDP.GetChosenMedia().FormatByPayload(ss.rtpPayloadType)
-							fmt.Printf("Inband - RTP Audio Tone (%s) - Received: %s\n", frmt.Name, dtmf)
+							ss.processDTMF(dtmf, fmt.Sprintf("Inband - RTP Audio Tone (%s) - Received: ", frmt.Name))
 						}
 					} else {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
@@ -351,29 +343,111 @@ func (ss *SipSession) parseDTMF(bytes []byte, m Method, bt BodyType) {
 		return
 	}
 	dtmf := DicDTMFEvent[DicDTMFSignal[signal]]
-	fmt.Printf("OOB - SIP %s (%s) - Received: %s\n", m.String(), DicBodyContentType[bt], dtmf)
+	ss.processDTMF(dtmf, fmt.Sprintf("OOB - SIP %s (%s) - Received: ", m.String(), DicBodyContentType[bt]))
 }
 
-func (ss *SipSession) stopRTPStreaming() {
+func (ss *SipSession) processDTMF(dtmf, details string) {
+	ss.lastDTMF = dtmf
+	if ss.bargeEnabled && ss.stopRTPStreaming() {
+		LogInfo(LTMediaCapability, "Audio streaming has been interrupted")
+	}
+	LogInfo(LTDTMF, details+dtmf)
+}
+
+func (ss *SipSession) parseXMLnPlay(bytes []byte, bt BodyType) (int, string) {
+	if bt != MSCXML {
+		return 400, "Unsupported Info body"
+	}
+	var mrqst MSCRequest
+	if err := xml.Unmarshal(bytes, &mrqst); err != nil {
+		return 400, "Bad XML body"
+	}
+	var rqstnm string
+	pc := mrqst.Request.PlayCollect
+	p := mrqst.Request.Play
+	var prmpt Prompt
+	var loopflag bool
+	ss.bargeEnabled = false
+	if pc != nil {
+		rqstnm = "playcollect"
+		prmpt = pc.Prompt
+		ss.bargeEnabled = pc.Barge == "yes"
+	} else if p != nil {
+		rqstnm = "play"
+		prmpt = p.Prompt
+		loopflag = prmpt.Repeat == "infinite"
+	} else {
+		return 400, "Bad MSC request"
+	}
+	audio := prmpt.Audio
+	if len(audio) == 0 {
+		return 400, "No defined prompt audio in MSC request"
+	}
+	// pcmbytes, ok := ss.MRFRepo.Get(audio[0].URL)
+	// if !ok {
+	// 	return 400, "Requested MSC prompt audio not found or empty"
+	// }
+	ss.stopRTPStreaming()
+	go func() {
+		tmNow := time.Now()
+	loop:
+		stopped := false
+		for i := 0; i < len(audio); i++ {
+			url := audio[i].URL
+			pcmbytes, ok := ss.MRFRepo.Get(url)
+			if !ok {
+				LogWarning(LTConfiguration, fmt.Sprintf("Requested MSC prompt audio [%s] not found or empty in Repo [%s] - Call ID [%s]", url, ss.MRFRepo.name, ss.CallID))
+				continue
+			}
+			if stopped = ss.startRTPStreaming(pcmbytes, true, loopflag, false); stopped {
+				break
+			}
+		}
+		if !ss.IsDisposed {
+			if loopflag {
+				goto loop
+			}
+			var txt, dtmf string
+			if stopped {
+				txt = "interrupted"
+				dtmf = ""
+			} else {
+				txt = "timeout"
+				dtmf = ss.lastDTMF
+			}
+			mresp := NewMSCResponse(int(time.Since(tmNow).Milliseconds()), 200, txt, "The request has succeeded", rqstnm, dtmf)
+			mrespBytes, err := xml.Marshal(mresp)
+			if err != nil {
+
+			}
+			ss.SendRequest(INFO, nil, NewMSCXML(mrespBytes))
+		}
+	}()
+	return 200, ""
+}
+
+func (ss *SipSession) stopRTPStreaming() bool {
 	ss.rtpmutex.Lock()
 	if !ss.isrtpstreaming {
 		ss.rtpmutex.Unlock()
-		return
+		return false
 	}
 	ss.rtpmutex.Unlock()
 
 	select {
 	case ss.rtpChan <- true:
+		return true
 	default:
 		<-ss.rtpChan
 	}
+	return false
 }
 
-func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, dropCallflag bool) {
+func (ss *SipSession) startRTPStreaming(pcm []int16, resetflag, loopflag, dropCallflag bool) bool {
 	ss.rtpmutex.Lock()
 	if ss.isrtpstreaming {
 		ss.rtpmutex.Unlock()
-		return
+		return true
 	}
 	ss.isrtpstreaming = true
 	ss.rtpmutex.Unlock()
@@ -381,13 +455,13 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 	origPayload := ss.rtpPayloadType
 
 	// TODO see if i can support more codecs
-	pcm, ok := ss.MRFRepo.Get(afname) // TODO build repos and manage them from UI
-	if !ok {
-		fmt.Printf("Cannot find audio [%s]\n", afname) // TODO handle that in INFO
-		goto finish1
-	}
+	// pcm, ok := ss.MRFRepo.Get(afname) // TODO build repos and manage them from UI
+	// if !ok {
+	// 	fmt.Printf("Cannot find audio [%s]\n", afname) // TODO handle that in INFO
+	// 	goto finish1
+	// }
 
-	// {
+	// { To test transcoding is not corrupting data
 	// 	g722 := rtp.PCM2G722(pcm)
 	// 	pcm = rtp.G722toPCM(g722)
 	// 	ulaw := rtp.PCM2G711U(pcm)
@@ -395,6 +469,8 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 	// 	alaw := rtp.PCM2G711A(pcm)
 	// 	pcm = rtp.G711A2PCM(alaw)
 	// }
+
+	isFinished := true // to know that streaming has reached its end
 
 	{
 		data, silence := rtp.TxPCMnSilence(pcm, ss.rtpPayloadType)
@@ -407,21 +483,20 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 
 		Marker := true
 
-		if resetflag { // TODO this flag has no real need, just reset the index each time
+		if resetflag {
 			ss.rtpIndex = 0
 		}
-
-		isFinished := false // to know that streaming has reached its end
 
 		for {
 			select {
 			case <-ss.rtpChan:
+				isFinished = false
 				goto finish2
 			case <-tckr.C:
 			}
 
 			if origPayload != ss.rtpPayloadType {
-				defer ss.startRTPStreaming(afname, false, loopflag, true)
+				defer ss.startRTPStreaming(pcm, false, loopflag, dropCallflag)
 				goto finish1
 			}
 
@@ -442,6 +517,7 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 			if RTPPayloadSize <= delta {
 				payload = (data)[ss.rtpIndex : ss.rtpIndex+RTPPayloadSize]
 				ss.rtpIndex += RTPPayloadSize
+				isFinished = false
 			} else {
 				payload = (data)[ss.rtpIndex : ss.rtpIndex+delta]
 				for n := delta; n < RTPPayloadSize; n++ {
@@ -452,15 +528,19 @@ func (ss *SipSession) startRTPStreaming(afname string, resetflag, loopflag, drop
 			}
 
 			if !ss.IsCallHeld {
-				pkt := RTPTXBufferPool.Get().([]byte)[:0]
+				pktptr := RTPTXBufferPool.Get().(*[]byte)
+				pkt := (*pktptr)[:0]
 				pkt = append(pkt, 128)
 				pkt = append(pkt, bool2byte(Marker)*128+ss.rtpPayloadType)
 				pkt = append(pkt, uint16ToBytes(ss.rtpSequenceNum)...)
 				pkt = append(pkt, uint32ToBytes(ss.rtpTimeStmp)...)
 				pkt = append(pkt, uint32ToBytes(ss.rtpSSRC)...)
 				pkt = append(pkt, payload...)
-				ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
-				RTPTXBufferPool.Put(pkt[:0])
+				_, err := ss.MediaListener.WriteToUDP(pkt, ss.RemoteMedia)
+				if err != nil {
+					goto finish1
+				}
+				RTPTXBufferPool.Put(pktptr)
 			}
 
 			Marker = false
@@ -490,8 +570,10 @@ finish2:
 	ss.rtpmutex.Unlock()
 
 	if dropCallflag {
-		ss.ReleaseMe("audio finished")
+		ss.ReleaseMe("audio playback ended")
 	}
+
+	return !isFinished
 }
 
 // =========================================================================================================================
@@ -550,17 +632,35 @@ type Audio struct {
 
 // Response:
 type MSCResponse struct {
-	XMLName  xml.Name `xml:"MediaServerControl"`
-	Version  string   `xml:"version,attr"`
-	Response struct {
-		PlayDuration int    `xml:"playduration,attr"`
-		Reason       string `xml:"reason,attr"`
-		PlayOffset   int    `xml:"playoffset,attr"`
-		Text         string `xml:"text,attr"`
-		Request      string `xml:"request,attr"`
-		Code         int    `xml:"code,attr"`
-		Digits       string `xml:"digits,attr,omitempty"`
-	} `xml:"response"`
+	XMLName  xml.Name  `xml:"MediaServerControl"`
+	Version  string    `xml:"version,attr"`
+	Response xResponse `xml:"response"`
+}
+
+type xResponse struct {
+	PlayDuration int    `xml:"playduration,attr"`
+	Reason       string `xml:"reason,attr"`
+	PlayOffset   int    `xml:"playoffset,attr"`
+	Text         string `xml:"text,attr"`
+	Request      string `xml:"request,attr"`
+	Code         int    `xml:"code,attr"`
+	Digits       string `xml:"digits,attr,omitempty"`
+}
+
+func NewMSCResponse(pd, cd int, rsn, txt, rqst, dgts string) MSCResponse {
+	return MSCResponse{
+		XMLName: xml.Name{Local: "MediaServerControl"},
+		Version: "1.0",
+		Response: xResponse{
+			PlayDuration: pd,
+			Reason:       rsn,
+			PlayOffset:   pd,
+			Text:         txt,
+			Request:      rqst,
+			Code:         cd,
+			Digits:       dgts,
+		},
+	}
 }
 
 // ============================================================================

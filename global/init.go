@@ -15,8 +15,8 @@
 package global
 
 import (
+	"MRFGo/dtmf"
 	"MRFGo/rtp"
-	"MRFGo/rtp/dtmf"
 	"encoding/binary"
 	"sync"
 )
@@ -38,7 +38,8 @@ func InitializeEngine() {
 func newSyncPool(bsz, csz int) *sync.Pool {
 	return &sync.Pool{
 		New: func() any {
-			return make([]byte, bsz, csz)
+			lst := make([]byte, bsz, csz)
+			return &lst
 		},
 	}
 }

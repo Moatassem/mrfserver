@@ -243,6 +243,7 @@ const (
 	LTLicense
 	LTLogInOut
 	LTMediaCapability
+	LTMediaStack
 	LTNAT
 	LTPESQScore
 	LTResourceLimitation
@@ -259,7 +260,7 @@ const (
 	LTUnhandledCritical
 	LTUnspecified
 	LTWebSocketData
-	LTNone LogTitle = -1
+	LTNone
 )
 
 func (lt LogTitle) String() string {

@@ -15,7 +15,7 @@
 package sip
 
 import (
-	. "MRFGo/global"
+	"MRFGo/global"
 	"fmt"
 	"strings"
 )
@@ -40,9 +40,9 @@ func NewSHsFromMap(mp map[string][]string) SipHeaders {
 func NewSHsPointer(setDefaults bool) *SipHeaders {
 	headers := NewSipHeaders()
 	if setDefaults {
-		headers.AddHeader(User_Agent, B2BUAName)
-		headers.AddHeader(Server, B2BUAName)
-		headers.AddHeader(Allow, AllowedMethods)
+		headers.AddHeader(global.User_Agent, global.B2BUAName)
+		headers.AddHeader(global.Server, global.B2BUAName)
+		headers.AddHeader(global.Allow, global.AllowedMethods)
 	}
 	return &headers
 }
@@ -50,11 +50,11 @@ func NewSHsPointer(setDefaults bool) *SipHeaders {
 func NewSHQ850OrSIP(Q850OrSIP int, Details string, retryAfter string) SipHeaders {
 	headers := NewSipHeaders()
 	if retryAfter != "" {
-		headers.AddHeader(Retry_After, retryAfter)
+		headers.AddHeader(global.Retry_After, retryAfter)
 	}
 	if Q850OrSIP == 0 {
 		if strings.TrimSpace(Details) != "" {
-			headers.AddHeader(Warning, fmt.Sprintf("399 MRFGo \"%s\"", Details))
+			headers.AddHeader(global.Warning, fmt.Sprintf("399 MRFGo \"%s\"", Details))
 		}
 	} else {
 		var reason string
@@ -66,7 +66,7 @@ func NewSHQ850OrSIP(Q850OrSIP int, Details string, retryAfter string) SipHeaders
 		if strings.TrimSpace(Details) != "" {
 			reason += fmt.Sprintf(";text=\"%s\"", Details)
 		}
-		headers.AddHeader(Reason, reason)
+		headers.AddHeader(global.Reason, reason)
 	}
 	return headers
 }
@@ -91,13 +91,13 @@ func (headers *SipHeaders) GetHeaderNames() []string {
 
 // headerName is case insensitive
 func (headers *SipHeaders) HeaderExists(headerName string) bool {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	_, ok := headers._map[headerName]
 	return ok
 }
 
 func (headers *SipHeaders) HeaderCount(headerName string) int {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	v, ok := headers._map[headerName]
 	if ok {
 		return len(v)
@@ -106,22 +106,22 @@ func (headers *SipHeaders) HeaderCount(headerName string) int {
 }
 
 func (headers *SipHeaders) DoesValueExistInHeader(headerName string, headerValue string) bool {
-	headerValue = ASCIIToLower(headerValue)
+	headerValue = global.ASCIIToLower(headerValue)
 	_, values := headers.Values(headerName)
 	for _, hv := range values {
-		if strings.Contains(ASCIIToLower(hv), headerValue) {
+		if strings.Contains(global.ASCIIToLower(hv), headerValue) {
 			return true
 		}
 	}
 	return false
 }
 
-func (headers *SipHeaders) AddHeader(header HeaderEnum, headerValue string) {
+func (headers *SipHeaders) AddHeader(header global.HeaderEnum, headerValue string) {
 	headers.Add(header.String(), headerValue)
 }
 
 func (headers *SipHeaders) Add(headerName string, headerValue string) {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	v, ok := headers._map[headerName]
 	if ok {
 		headers._map[headerName] = append(v, headerValue)
@@ -131,7 +131,7 @@ func (headers *SipHeaders) Add(headerName string, headerValue string) {
 }
 
 func (headers *SipHeaders) AddHeaderValues(headerName string, headerValues []string) {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	v, ok := headers._map[headerName]
 	if ok {
 		headers._map[headerName] = append(v, headerValues...)
@@ -140,21 +140,21 @@ func (headers *SipHeaders) AddHeaderValues(headerName string, headerValues []str
 	}
 }
 
-func (headers *SipHeaders) SetHeader(header HeaderEnum, headerValue string) {
+func (headers *SipHeaders) SetHeader(header global.HeaderEnum, headerValue string) {
 	headers.Set(header.String(), headerValue)
 }
 
 func (headers *SipHeaders) Set(headerName string, headerValue string) {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	headers._map[headerName] = []string{headerValue}
 }
 
-func (headers *SipHeaders) ValuesHeader(header HeaderEnum) (bool, []string) {
+func (headers *SipHeaders) ValuesHeader(header global.HeaderEnum) (bool, []string) {
 	return headers.Values(header.String())
 }
 
 func (headers *SipHeaders) Values(headerName string) (bool, []string) {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	v, ok := headers._map[headerName]
 	if ok {
 		return true, v
@@ -165,7 +165,7 @@ func (headers *SipHeaders) Values(headerName string) (bool, []string) {
 
 // returns headers with proper case - 'exceptHeaders' MUST be lower case headers!
 func (headers *SipHeaders) ValuesWithHeaderPrefix(headersPrefix string, exceptHeaders ...string) map[string][]string {
-	headersPrefix = ASCIIToLower(headersPrefix)
+	headersPrefix = global.ASCIIToLower(headersPrefix)
 	data := make(map[string][]string)
 outer:
 	for k, v := range headers._map {
@@ -175,14 +175,14 @@ outer:
 					continue outer
 				}
 			}
-			data[HeaderCase(k)] = v
+			data[global.HeaderCase(k)] = v
 		}
 	}
 	return data
 }
 
 func (headers *SipHeaders) DeleteHeadersWithPrefix(headersPrefix string) {
-	headersPrefix = ASCIIToLower(headersPrefix)
+	headersPrefix = global.ASCIIToLower(headersPrefix)
 	var hdrs []string
 	for ky := range headers._map {
 		if strings.HasPrefix(ky, headersPrefix) {
@@ -194,7 +194,7 @@ func (headers *SipHeaders) DeleteHeadersWithPrefix(headersPrefix string) {
 	}
 }
 
-func (headers *SipHeaders) ValueHeader(header HeaderEnum) string {
+func (headers *SipHeaders) ValueHeader(header global.HeaderEnum) string {
 	return headers.Value(header.String())
 }
 
@@ -206,7 +206,7 @@ func (headers *SipHeaders) Value(headerName string) string {
 }
 
 func (headers *SipHeaders) Delete(headerName string) bool {
-	headerName = ASCIIToLower(headerName)
+	headerName = global.ASCIIToLower(headerName)
 	_, ok := headers._map[headerName]
 	if ok {
 		delete(headers._map, headerName)
@@ -216,21 +216,21 @@ func (headers *SipHeaders) Delete(headerName string) bool {
 
 func (headers *SipHeaders) ContainsToTag() bool {
 	toheader := headers._map["to"]
-	return strings.Contains(ASCIIToLower(toheader[0]), "tag")
+	return strings.Contains(global.ASCIIToLower(toheader[0]), "tag")
 }
 
-func (headers *SipHeaders) AnyMandatoryHeadersMissing(m Method) (bool, string) {
-	for _, mh := range MandatoryHeaders {
+func (headers *SipHeaders) AnyMandatoryHeadersMissing(m global.Method) (bool, string) {
+	for _, mh := range global.MandatoryHeaders {
 		if !headers.HeaderExists(mh) {
 			return true, mh
 		}
 	}
-	if m == INVITE {
-		mh := Max_Forwards.String()
+	if m == global.INVITE {
+		mh := global.Max_Forwards.String()
 		if !headers.HeaderExists(mh) {
 			return true, mh
 		}
-		mh = Contact.String()
+		mh = global.Contact.String()
 		if !headers.HeaderExists(mh) {
 			return true, mh
 		}

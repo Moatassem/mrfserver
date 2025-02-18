@@ -20,6 +20,7 @@ const (
 var MRFRepos *MRFRepoCollection
 
 type MRFRepo struct {
+	name string
 	mu   sync.RWMutex
 	data map[string][]int16
 }
@@ -53,7 +54,7 @@ func getExtension(fn string) string {
 
 func loadMedia(rn string) map[string]*MRFRepo {
 	mrfrepos := make(map[string]*MRFRepo)
-	mrfrepo := MRFRepo{data: make(map[string][]int16)}
+	mrfrepo := MRFRepo{name: rn, data: make(map[string][]int16)}
 	mrfrepos[rn] = &mrfrepo
 
 	dentries, err := os.ReadDir(global.MediaPath)
@@ -142,7 +143,7 @@ func (mrfrp *MRFRepo) Get(key string) ([]int16, bool) {
 	mrfrp.mu.RLock()
 	defer mrfrp.mu.RUnlock()
 	if pcm, ok := mrfrp.data[key]; ok {
-		if pcm == nil || len(pcm) == 0 {
+		if len(pcm) == 0 {
 			return nil, false
 		}
 		return pcm, ok

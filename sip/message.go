@@ -15,19 +15,18 @@
 package sip
 
 import (
-	. "MRFGo/global"
+	"MRFGo/global"
 	"MRFGo/numtype"
 	"bytes"
 	"cmp"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"slices"
 	"strings"
 )
 
 type SipMessage struct {
-	MsgType   MessageType
+	MsgType   global.MessageType
 	StartLine *SipStartLine
 	Headers   *SipHeaders
 	Body      *MessageBody
@@ -48,13 +47,13 @@ type SipMessage struct {
 
 	MaxFwds       int
 	CSeqNum       uint32
-	CSeqMethod    Method
+	CSeqMethod    global.Method
 	ContentLength uint16 //only set for incoming messages
 }
 
-func NewRequestMessage(md Method, up string) *SipMessage {
+func NewRequestMessage(md global.Method, up string) *SipMessage {
 	sipmsg := &SipMessage{
-		MsgType: REQUEST,
+		MsgType: global.REQUEST,
 		StartLine: &SipStartLine{
 			Method:    md,
 			UriScheme: "sip",
@@ -65,11 +64,11 @@ func NewRequestMessage(md Method, up string) *SipMessage {
 }
 
 func NewResponseMessage(sc int, rp string) *SipMessage {
-	sipmsg := &SipMessage{MsgType: RESPONSE, StartLine: new(SipStartLine)}
+	sipmsg := &SipMessage{MsgType: global.RESPONSE, StartLine: new(SipStartLine)}
 	if 100 <= sc && sc <= 699 {
 		sipmsg.StartLine.StatusCode = sc
-		dfltsc := Str2Int[int](fmt.Sprintf("%d00", sc/100))
-		sipmsg.StartLine.ReasonPhrase = cmp.Or(rp, DicResponse[sc], DicResponse[dfltsc])
+		dfltsc := global.Str2Int[int](fmt.Sprintf("%d00", sc/100))
+		sipmsg.StartLine.ReasonPhrase = cmp.Or(rp, global.DicResponse[sc], global.DicResponse[dfltsc])
 	}
 	return sipmsg
 }
@@ -77,11 +76,11 @@ func NewResponseMessage(sc int, rp string) *SipMessage {
 // ==========================================================================
 
 func (sipmsg *SipMessage) getAddBodyParts() []int {
-	hv := ASCIIToLower(sipmsg.Headers.ValueHeader(P_Add_BodyPart))
+	hv := global.ASCIIToLower(sipmsg.Headers.ValueHeader(global.P_Add_BodyPart))
 	hv = strings.ReplaceAll(hv, " ", "")
 	partflags := strings.Split(hv, ",")
 	var flags []int
-	for k, v := range BodyAddParts {
+	for k, v := range global.BodyAddParts {
 		if slices.Contains(partflags, v) {
 			flags = append(flags, k)
 		}
@@ -98,33 +97,33 @@ func (sipmsg *SipMessage) AddRequestedBodyParts() {
 	msgbdy := sipmsg.Body
 	hdrs := sipmsg.Headers
 	if len(msgbdy.PartsContents) == 1 {
-		frstbt := FirstKey(msgbdy.PartsContents)
-		cntnthdrsmap := hdrs.ValuesWithHeaderPrefix("Content-", Content_Length.LowerCaseString())
+		frstbt := global.FirstKey(msgbdy.PartsContents)
+		cntnthdrsmap := hdrs.ValuesWithHeaderPrefix("Content-", global.Content_Length.LowerCaseString())
 		hdrs.DeleteHeadersWithPrefix("Content-")
 		msgbdy.PartsContents[frstbt] = ContentPart{Headers: NewSHsFromMap(cntnthdrsmap), Bytes: msgbdy.PartsContents[frstbt].Bytes}
 	}
 	for _, pf := range pflags {
 		switch pf {
-		case AddXMLPIDFLO:
-			bt := PIDFXML
+		case global.AddXMLPIDFLO:
+			bt := global.PIDFXML
 			xml := `<?xml version="1.0" encoding="UTF-8"?><presence xmlns="urn:ietf:params:xml:ns:pidf" xmlns:gp="urn:ietf:params:xml:ns:pidf:geopriv10" xmlns:cl="urn:ietf:params:xml:ns:pidf:geopriv10:civicLoc" xmlns:btd="http://btd.orange-business.com" entity="pres:geotarget@btip.orange-business.com"><tuple id="sg89ae"><status><gp:geopriv><gp:location-info><cl:civicAddress><cl:country>FR</cl:country><cl:A2>35</cl:A2><cl:A3>CESSON SEVIGNE</cl:A3><cl:A6>DU CHENE GERMAIN</cl:A6><cl:HNO>9</cl:HNO><cl:STS>RUE</cl:STS><cl:PC>35510</cl:PC><cl:CITYCODE>99996</cl:CITYCODE></cl:civicAddress></gp:location-info><gp:usage-rules></gp:usage-rules></gp:geopriv></status></tuple></presence>`
 			xmlbytes := []byte(xml)
 			msgbdy.PartsContents[bt] = NewContentPart(bt, xmlbytes)
-		case AddINDATA:
-			bt := VndOrangeInData
+		case global.AddINDATA:
+			bt := global.VndOrangeInData
 			binbytes, _ := hex.DecodeString("77124700830e8307839069391718068a019288000d0a")
 			sh := NewSipHeaders()
-			sh.AddHeader(Content_Type, DicBodyContentType[bt])
-			sh.AddHeader(Content_Transfer_Encoding, "binary")
-			sh.AddHeader(Content_Disposition, "signal;handling=optional")
+			sh.AddHeader(global.Content_Type, global.DicBodyContentType[bt])
+			sh.AddHeader(global.Content_Transfer_Encoding, "binary")
+			sh.AddHeader(global.Content_Disposition, "signal;handling=optional")
 			msgbdy.PartsContents[bt] = ContentPart{Headers: sh, Bytes: binbytes}
 		}
 	}
 }
 
-func (sipmsg *SipMessage) KeepOnlyBodyPart(bt BodyType) bool {
+func (sipmsg *SipMessage) KeepOnlyBodyPart(bt global.BodyType) bool {
 	msgbdy := sipmsg.Body
-	kys := Keys(msgbdy.PartsContents) //get all keys
+	kys := global.Keys(msgbdy.PartsContents) //get all keys
 	if len(kys) == 1 && kys[0] == bt {
 		return true //to avoid removing Content-* headers while there is no Content headers inside the single body part
 	}
@@ -147,19 +146,19 @@ func (sipmsg *SipMessage) KeepOnlyBodyPart(bt BodyType) bool {
 	return true
 }
 
-func (sipmsg *SipMessage) GetBodyPart(bt BodyType) ([]byte, bool) {
+func (sipmsg *SipMessage) GetBodyPart(bt global.BodyType) ([]byte, bool) {
 	cntnt, ok := sipmsg.Body.PartsContents[bt]
 	return cntnt.Bytes, ok
 }
 
-func (sipmsg *SipMessage) GetSingleBody() (BodyType, []byte, bool) {
+func (sipmsg *SipMessage) GetSingleBody() (global.BodyType, []byte, bool) {
 	if sipmsg.Body.WithNoBody() || sipmsg.Body.WithUnknownBodyPart() {
-		return None, nil, false
+		return global.None, nil, false
 	}
 	if len(sipmsg.Body.PartsContents) > 1 {
-		return None, nil, false
+		return global.None, nil, false
 	}
-	bt, cp := FirstKeyValue(sipmsg.Body.PartsContents)
+	bt, cp := global.FirstKeyValue(sipmsg.Body.PartsContents)
 	return bt, cp.Bytes, true
 }
 
@@ -170,53 +169,53 @@ func (sipmsg *SipMessage) IsOutOfDialgoue() bool {
 }
 
 func (sipmsg *SipMessage) GetRSeqFromRAck() (rSeq, cSeq uint32, ok bool) {
-	rAck := sipmsg.Headers.ValueHeader(RAck)
+	rAck := sipmsg.Headers.ValueHeader(global.RAck)
 	if rAck == "" {
-		LogError(LTSIPStack, "Empty RAck header")
+		global.LogError(global.LTSIPStack, "Empty RAck header")
 		ok = false
 		return
 	}
-	mtch := DicFieldRegEx[RAckHeader].FindStringSubmatch(rAck)
+	mtch := global.DicFieldRegEx[global.RAckHeader].FindStringSubmatch(rAck)
 	if mtch == nil { // Ensure we have both RSeq and CSeq from the match
-		LogError(LTSIPStack, "Malformed RAck header")
+		global.LogError(global.LTSIPStack, "Malformed RAck header")
 		ok = false
 		return
 	}
-	rSeq = Str2Uint[uint32](mtch[1])
-	cSeq = Str2Uint[uint32](mtch[2])
+	rSeq = global.Str2Uint[uint32](mtch[1])
+	cSeq = global.Str2Uint[uint32](mtch[2])
 	ok = true
 	return
 }
 
 func (sipmsg *SipMessage) IsOptionSupportedOrRequired(opt string) bool {
-	hdr := sipmsg.Headers.ValueHeader(Require)
+	hdr := sipmsg.Headers.ValueHeader(global.Require)
 	if strings.Contains(hdr, opt) {
 		return true
 	}
-	hdr = sipmsg.Headers.ValueHeader(Supported)
+	hdr = sipmsg.Headers.ValueHeader(global.Supported)
 	return strings.Contains(hdr, opt)
 }
 
 func (sipmsg *SipMessage) IsOptionSupported(o string) bool {
-	hdr := sipmsg.Headers.ValueHeader(Supported)
-	hdr = ASCIIToLower(hdr)
+	hdr := sipmsg.Headers.ValueHeader(global.Supported)
+	hdr = global.ASCIIToLower(hdr)
 	return hdr != "" && strings.Contains(hdr, o)
 }
 
 func (sipmsg *SipMessage) IsOptionRequired(o string) bool {
-	hdr := sipmsg.Headers.ValueHeader(Require)
-	hdr = ASCIIToLower(hdr)
+	hdr := sipmsg.Headers.ValueHeader(global.Require)
+	hdr = global.ASCIIToLower(hdr)
 	return hdr != "" && strings.Contains(hdr, o)
 }
 
-func (sipmsg *SipMessage) IsMethodAllowed(m Method) bool {
-	hdr := sipmsg.Headers.ValueHeader(Allow)
-	hdr = ASCIIToLower(hdr)
-	return hdr != "" && strings.Contains(hdr, ASCIIToLower(m.String()))
+func (sipmsg *SipMessage) IsMethodAllowed(m global.Method) bool {
+	hdr := sipmsg.Headers.ValueHeader(global.Allow)
+	hdr = global.ASCIIToLower(hdr)
+	return hdr != "" && strings.Contains(hdr, global.ASCIIToLower(m.String()))
 }
 
 func (sipmsg *SipMessage) IsKnownRURIScheme() bool {
-	for _, s := range UriSchemes {
+	for _, s := range global.UriSchemes {
 		if s == sipmsg.StartLine.UriScheme {
 			return true
 		}
@@ -224,47 +223,47 @@ func (sipmsg *SipMessage) IsKnownRURIScheme() bool {
 	return false
 }
 
-func (sipmsg *SipMessage) GetReferToRUIR() (string, error) {
-	ok, values := sipmsg.Headers.ValuesHeader(Refer_To)
-	if !ok {
-		return "", errors.New("No Refer-To header")
-	}
-	if len(values) > 1 {
-		return "", errors.New("Multiple Refer-To headers found")
-	}
-	value := values[0]
-	if strings.Contains(ASCIIToLower(value), "replaces") {
-		return "", errors.New("Refer-To with Replaces")
-	}
-	var mtch []string
-	if !RMatch(value, URIFull, &mtch) {
-		return "", errors.New("Badly formatted URI")
-	}
-	return mtch[1], nil
-}
+// func (sipmsg *SipMessage) GetReferToRUIR() (string, error) {
+// 	ok, values := sipmsg.Headers.ValuesHeader(Refer_To)
+// 	if !ok {
+// 		return "", errors.New("No Refer-To header")
+// 	}
+// 	if len(values) > 1 {
+// 		return "", errors.New("Multiple Refer-To headers found")
+// 	}
+// 	value := values[0]
+// 	if strings.Contains(ASCIIToLower(value), "replaces") {
+// 		return "", errors.New("Refer-To with Replaces")
+// 	}
+// 	var mtch []string
+// 	if !RMatch(value, URIFull, &mtch) {
+// 		return "", errors.New("Badly formatted URI")
+// 	}
+// 	return mtch[1], nil
+// }
 
-func (sipmsg *SipMessage) WithNoReferSubscription() bool {
-	if sipmsg.Headers.DoesValueExistInHeader(Require.String(), "norefersub") {
-		return true
-	}
-	if sipmsg.Headers.DoesValueExistInHeader(Supported.String(), "norefersub") {
-		return true
-	}
-	if sipmsg.Headers.DoesValueExistInHeader(Refer_Sub.String(), "false") {
-		return true
-	}
-	return false
-}
+// func (sipmsg *SipMessage) WithNoReferSubscription() bool {
+// 	if sipmsg.Headers.DoesValueExistInHeader(Require.String(), "norefersub") {
+// 		return true
+// 	}
+// 	if sipmsg.Headers.DoesValueExistInHeader(Supported.String(), "norefersub") {
+// 		return true
+// 	}
+// 	if sipmsg.Headers.DoesValueExistInHeader(Refer_Sub.String(), "false") {
+// 		return true
+// 	}
+// 	return false
+// }
 
 func (sipmsg *SipMessage) IsResponse() bool {
-	return sipmsg.MsgType == RESPONSE
+	return sipmsg.MsgType == global.RESPONSE
 }
 
 func (sipmsg *SipMessage) IsRequest() bool {
-	return sipmsg.MsgType == REQUEST
+	return sipmsg.MsgType == global.REQUEST
 }
 
-func (sipmsg *SipMessage) GetMethod() Method {
+func (sipmsg *SipMessage) GetMethod() global.Method {
 	return sipmsg.StartLine.Method
 }
 
@@ -274,10 +273,10 @@ func (sipmsg *SipMessage) GetStatusCode() int {
 
 func (sipmsg *SipMessage) GetRegistrationData() (contact, ext, ruri, ipport string, expiresInt int) {
 	// TODO fix the Regex
-	contact = sipmsg.Headers.ValueHeader(Contact)
+	contact = sipmsg.Headers.ValueHeader(global.Contact)
 	contact1 := strings.Replace(contact, "-", ";", 1) // Contact: <sip:12345-0x562f8a9e7390@172.20.40.132:5030>;expires=30;+sip.instance="<urn:uuid:da213fce-693c-3403-8455-a548a10ef970>"
 	var mtch []string
-	if RMatch(contact1, INVITERURI, &mtch) {
+	if global.RMatch(contact1, global.INVITERURI, &mtch) {
 		ruri = mtch[0]
 		ext = mtch[2]
 		ipport = mtch[5]
@@ -285,18 +284,18 @@ func (sipmsg *SipMessage) GetRegistrationData() (contact, ext, ruri, ipport stri
 		expiresInt = -100 // bad contact
 		return
 	}
-	if RMatch(contact, ExpiresParameter, &mtch) {
-		expiresInt = Str2Int[int](mtch[1])
+	if global.RMatch(contact, global.ExpiresParameter, &mtch) {
+		expiresInt = global.Str2Int[int](mtch[1])
 		return
 	}
-	expires := sipmsg.Headers.ValueHeader(Expires)
+	expires := sipmsg.Headers.ValueHeader(global.Expires)
 	if expires != "" {
-		expiresInt = Str2Int[int](expires)
+		expiresInt = global.Str2Int[int](expires)
 		return
 	}
 	expires = "3600"
-	sipmsg.Headers.SetHeader(Expires, expires)
-	expiresInt = Str2Int[int](expires)
+	sipmsg.Headers.SetHeader(global.Expires, expires)
+	expiresInt = global.Str2Int[int](expires)
 	return
 }
 
@@ -304,45 +303,45 @@ func (sipmsg *SipMessage) TranslateRM(ss *SipSession, tx *Transaction, nt numtyp
 	if NewNumber == "" {
 		return
 	}
-	localsocket := GetUDPAddrFromConn(ss.SIPUDPListenser)
+	localsocket := global.GetUDPAddrFromConn(ss.SIPUDPListenser)
 	rep := fmt.Sprintf("${1}%s$2", NewNumber)
 
 	switch nt {
 	case numtype.CalledRURI:
-		sipmsg.StartLine.Ruri = RReplaceNumberOnly(sipmsg.StartLine.Ruri, rep)
+		sipmsg.StartLine.Ruri = global.RReplaceNumberOnly(sipmsg.StartLine.Ruri, rep)
 		sipmsg.StartLine.UserPart = NewNumber
 		ss.RemoteContactURI = sipmsg.StartLine.Ruri
 	case numtype.CalledTo:
-		sipmsg.Headers.SetHeader(To, RReplaceNumberOnly(sipmsg.Headers.ValueHeader(To), rep))
-		ss.ToHeader = sipmsg.Headers.ValueHeader(To)
+		sipmsg.Headers.SetHeader(global.To, global.RReplaceNumberOnly(sipmsg.Headers.ValueHeader(global.To), rep))
+		ss.ToHeader = sipmsg.Headers.ValueHeader(global.To)
 		tx.To = ss.ToHeader
 	case numtype.CalledBoth:
-		sipmsg.StartLine.Ruri = RReplaceNumberOnly(sipmsg.StartLine.Ruri, rep)
+		sipmsg.StartLine.Ruri = global.RReplaceNumberOnly(sipmsg.StartLine.Ruri, rep)
 		sipmsg.StartLine.UserPart = NewNumber
 		ss.RemoteContactURI = sipmsg.StartLine.Ruri
 
-		sipmsg.Headers.SetHeader(To, RReplaceNumberOnly(sipmsg.Headers.ValueHeader(To), rep))
-		ss.ToHeader = sipmsg.Headers.ValueHeader(To)
+		sipmsg.Headers.SetHeader(global.To, global.RReplaceNumberOnly(sipmsg.Headers.ValueHeader(global.To), rep))
+		ss.ToHeader = sipmsg.Headers.ValueHeader(global.To)
 		tx.To = ss.ToHeader
 	case numtype.CallingFrom:
-		sipmsg.Headers.SetHeader(From, RReplaceNumberOnly(sipmsg.Headers.ValueHeader(From), rep))
-		ss.FromHeader = sipmsg.Headers.ValueHeader(From)
+		sipmsg.Headers.SetHeader(global.From, global.RReplaceNumberOnly(sipmsg.Headers.ValueHeader(global.From), rep))
+		ss.FromHeader = sipmsg.Headers.ValueHeader(global.From)
 		tx.From = ss.FromHeader
 	case numtype.CallingPAI:
-		if sipmsg.Headers.HeaderExists(P_Asserted_Identity.String()) {
-			sipmsg.Headers.SetHeader(P_Asserted_Identity, RReplaceNumberOnly(sipmsg.Headers.ValueHeader(P_Asserted_Identity), rep))
+		if sipmsg.Headers.HeaderExists(global.P_Asserted_Identity.String()) {
+			sipmsg.Headers.SetHeader(global.P_Asserted_Identity, global.RReplaceNumberOnly(sipmsg.Headers.ValueHeader(global.P_Asserted_Identity), rep))
 		} else {
-			sipmsg.Headers.SetHeader(P_Asserted_Identity, fmt.Sprintf("<sip:%s@%s;user=phone>", NewNumber, localsocket.IP))
+			sipmsg.Headers.SetHeader(global.P_Asserted_Identity, fmt.Sprintf("<sip:%s@%s;user=phone>", NewNumber, localsocket.IP))
 		}
 	case numtype.CallingBoth:
-		if sipmsg.Headers.HeaderExists(P_Asserted_Identity.String()) {
-			sipmsg.Headers.SetHeader(P_Asserted_Identity, RReplaceNumberOnly(sipmsg.Headers.ValueHeader(P_Asserted_Identity), rep))
+		if sipmsg.Headers.HeaderExists(global.P_Asserted_Identity.String()) {
+			sipmsg.Headers.SetHeader(global.P_Asserted_Identity, global.RReplaceNumberOnly(sipmsg.Headers.ValueHeader(global.P_Asserted_Identity), rep))
 		} else {
-			sipmsg.Headers.SetHeader(P_Asserted_Identity, fmt.Sprintf("<sip:%s@%s;user=phone>", NewNumber, localsocket.IP))
+			sipmsg.Headers.SetHeader(global.P_Asserted_Identity, fmt.Sprintf("<sip:%s@%s;user=phone>", NewNumber, localsocket.IP))
 		}
 
-		sipmsg.Headers.SetHeader(From, RReplaceNumberOnly(sipmsg.Headers.ValueHeader(From), rep))
-		ss.FromHeader = sipmsg.Headers.ValueHeader(From)
+		sipmsg.Headers.SetHeader(global.From, global.RReplaceNumberOnly(sipmsg.Headers.ValueHeader(global.From), rep))
+		ss.FromHeader = sipmsg.Headers.ValueHeader(global.From)
 		tx.From = ss.FromHeader
 	}
 }
@@ -356,35 +355,35 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 	go func(bc chan<- []byte) {
 		var bb2 bytes.Buffer
 		if sipmsg.Body.PartsContents == nil {
-			sipmsg.Headers.SetHeader(Content_Type, "")
-			sipmsg.Headers.SetHeader(MIME_Version, "")
+			sipmsg.Headers.SetHeader(global.Content_Type, "")
+			sipmsg.Headers.SetHeader(global.MIME_Version, "")
 		} else {
 			bdyparts := sipmsg.Body.PartsContents
 			if len(bdyparts) == 1 {
-				k, v := FirstKeyValue(bdyparts)
-				sipmsg.Headers.SetHeader(Content_Type, DicBodyContentType[k])
-				sipmsg.Headers.SetHeader(MIME_Version, "")
+				k, v := global.FirstKeyValue(bdyparts)
+				sipmsg.Headers.SetHeader(global.Content_Type, global.DicBodyContentType[k])
+				sipmsg.Headers.SetHeader(global.MIME_Version, "")
 				bb2.Write(v.Bytes)
 			} else {
-				sipmsg.Headers.SetHeader(Content_Type, fmt.Sprintf("multipart/mixed;boundary=%v", MultipartBoundary))
-				sipmsg.Headers.SetHeader(MIME_Version, "1.0")
+				sipmsg.Headers.SetHeader(global.Content_Type, fmt.Sprintf("multipart/mixed;boundary=%v", global.MultipartBoundary))
+				sipmsg.Headers.SetHeader(global.MIME_Version, "1.0")
 				isfirstline := true
 				for _, ct := range bdyparts {
 					if !isfirstline {
 						bb2.WriteString("\r\n")
 					}
-					bb2.WriteString(fmt.Sprintf("--%v\r\n", MultipartBoundary))
+					bb2.WriteString(fmt.Sprintf("--%v\r\n", global.MultipartBoundary))
 					for _, h := range ct.Headers.GetHeaderNames() {
 						_, values := ct.Headers.Values(h)
 						for _, hv := range values {
-							bb2.WriteString(fmt.Sprintf("%v: %v\r\n", HeaderCase(h), hv))
+							bb2.WriteString(fmt.Sprintf("%v: %v\r\n", global.HeaderCase(h), hv))
 						}
 					}
 					bb2.WriteString("\r\n")
 					bb2.Write(ct.Bytes)
 					isfirstline = false
 				}
-				bb2.WriteString(fmt.Sprintf("\r\n--%v--\r\n", MultipartBoundary))
+				bb2.WriteString(fmt.Sprintf("\r\n--%v--\r\n", global.MultipartBoundary))
 			}
 		}
 		bc <- bb2.Bytes()
@@ -393,12 +392,12 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 	//startline
 	if sipmsg.IsRequest() {
 		sl := sipmsg.StartLine
-		bb.WriteString(fmt.Sprintf("%s %s %s\r\n", sl.Method.String(), sl.Ruri, SipVersion))
-		headers = DicRequestHeaders[sipmsg.StartLine.Method]
+		bb.WriteString(fmt.Sprintf("%s %s %s\r\n", sl.Method.String(), sl.Ruri, global.SipVersion))
+		headers = global.DicRequestHeaders[sipmsg.StartLine.Method]
 	} else {
 		sl := sipmsg.StartLine
-		bb.WriteString(fmt.Sprintf("%s %d %s\r\n", SipVersion, sl.StatusCode, sl.ReasonPhrase))
-		headers = DicResponseHeaders[sipmsg.StartLine.StatusCode]
+		bb.WriteString(fmt.Sprintf("%s %d %s\r\n", global.SipVersion, sl.StatusCode, sl.ReasonPhrase))
+		headers = global.DicResponseHeaders[sipmsg.StartLine.StatusCode]
 	}
 
 	// var bodybytes []byte
@@ -407,7 +406,7 @@ func (sipmsg *SipMessage) PrepareMessageBytes(ss *SipSession) {
 	//body - build body type, length, multipart and related headers
 	cntntlen := len(bodybytes)
 
-	sipmsg.Headers.SetHeader(Content_Length, fmt.Sprintf("%v", cntntlen))
+	sipmsg.Headers.SetHeader(global.Content_Length, fmt.Sprintf("%v", cntntlen))
 
 	//headers - build and write
 	for _, h := range headers {

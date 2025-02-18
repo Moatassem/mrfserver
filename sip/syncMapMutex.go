@@ -15,7 +15,7 @@
 package sip
 
 import (
-	. "MRFGo/global"
+	"MRFGo/global"
 	"sync"
 )
 
@@ -32,11 +32,11 @@ func (c *ConcurrentMapMutex) Store(ky string, ss *SipSession) (ok bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	ok = true
-	if ss.Direction == INBOUND && !CallLimiter.AcceptNewCall() {
+	if ss.Direction == global.INBOUND && !global.CallLimiter.AcceptNewCall() {
 		ok = false
 	}
 	c._map[ky] = ss
-	Prometrics.ConSessions.Inc()
+	global.Prometrics.ConSessions.Inc()
 	return
 }
 
@@ -44,7 +44,7 @@ func (c *ConcurrentMapMutex) Delete(ky string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c._map, ky)
-	Prometrics.ConSessions.Dec()
+	global.Prometrics.ConSessions.Dec()
 }
 
 func (c *ConcurrentMapMutex) Load(ky string) (*SipSession, bool) {

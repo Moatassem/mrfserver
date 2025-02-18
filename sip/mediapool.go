@@ -2,6 +2,7 @@ package sip
 
 import (
 	"MRFGo/global"
+	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -51,6 +52,6 @@ func (mpp *MediaPool) ReleaseSocket(conn *net.UDPConn) bool {
 		mpp.alloc[port] = false
 		return true
 	}
-	log.Printf("Port [%d] already released!\n", port)
+	global.LogWarning(global.LTMediaStack, fmt.Sprintf("Port [%d] already released!\n", port))
 	return false
 }

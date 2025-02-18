@@ -80,6 +80,8 @@ type SipSession struct {
 	rtpPayloadType uint8
 	rtpmutex       sync.Mutex
 	isrtpstreaming bool
+	bargeEnabled   bool
+	lastDTMF       string
 
 	FwdCSeq uint32
 	BwdCSeq uint32
