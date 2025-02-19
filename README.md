@@ -38,7 +38,7 @@ Environment variables must be defined in order to launch mrfgo container.
 
 ## Notes
 
-Use SoX: https://en.wikipedia.org/wiki/SoX
+Use SoX _Swiss Army Knife of sound processing utilities_ : https://en.wikipedia.org/wiki/SoX
 
 - For Windows: https://sourceforge.net/projects/sox/
 - For Linux/Ubuntu: https://manpages.ubuntu.com/manpages/focal/man1/sox.1.html
@@ -49,3 +49,4 @@ Use SoX: https://en.wikipedia.org/wiki/SoX
 ## Author
 
 - **Moatassem TALAAT** - _Complete implementation_ -
+- mailto:eng.moatassem@gmail.com
