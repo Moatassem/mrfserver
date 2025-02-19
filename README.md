@@ -4,9 +4,13 @@
 - Highly customizable mrfgo supporting Media Server Control
 - Docker-containerized compiled with golang:alpine
 
-## Launching the build
+## Building the docker image
 
-Construction is automatic via Git CI/CD pipeline
+- docker build -t mrfgo .
+
+## Running docker image
+
+- docker run -d --name mrfgo --net=host -e media_dir=".\\audio" mrfgo:latest
 
 ## Service Details
 

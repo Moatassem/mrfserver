@@ -41,7 +41,6 @@ func checkArgs() (string, int, int) {
 	ipv4, ok := os.LookupEnv(OwnIPv4)
 	if !ok {
 		global.LogError(global.LTConfiguration, "No self IPv4 address provided!")
-		os.Exit(1)
 	}
 
 	global.ServerIPv4 = net.ParseIP(ipv4)
