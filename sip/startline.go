@@ -1,6 +1,6 @@
 package sip
 
-import "MRFGo/global"
+import "mrfgo/global"
 
 // -------------------------------------------
 

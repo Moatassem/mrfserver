@@ -1,7 +1,7 @@
 package sip
 
 import (
-	"MRFGo/global"
+	"mrfgo/global"
 	"sync"
 )
 

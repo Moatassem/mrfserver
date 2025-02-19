@@ -1,9 +1,9 @@
 package global
 
 import (
-	"MRFGo/dtmf"
-	"MRFGo/rtp"
 	"encoding/binary"
+	"mrfgo/dtmf"
+	"mrfgo/rtp"
 	"sync"
 )
 

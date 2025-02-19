@@ -1,8 +1,8 @@
 package global
 
 import (
-	"MRFGo/cl"
-	"MRFGo/prometheus"
+	"mrfgo/cl"
+	"mrfgo/prometheus"
 	"net"
 	"regexp"
 	"sync"
@@ -10,7 +10,7 @@ import (
 
 const (
 	EntityName = "MT-Tools"
-	B2BUAName  = "MRFGo/1.0"
+	B2BUAName  = "mrfgo/1.0"
 
 	MRFRepoName = "ivr"
 

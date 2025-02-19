@@ -1,8 +1,8 @@
 package sip
 
 import (
-	"MRFGo/global"
 	"fmt"
+	"mrfgo/global"
 	"strings"
 )
 
@@ -40,7 +40,7 @@ func NewSHQ850OrSIP(Q850OrSIP int, Details string, retryAfter string) SipHeaders
 	}
 	if Q850OrSIP == 0 {
 		if strings.TrimSpace(Details) != "" {
-			headers.AddHeader(global.Warning, fmt.Sprintf("399 MRFGo \"%s\"", Details))
+			headers.AddHeader(global.Warning, fmt.Sprintf("399 mrfgo \"%s\"", Details))
 		}
 	} else {
 		var reason string

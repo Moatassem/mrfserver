@@ -1,9 +1,9 @@
 package sip
 
 import (
-	"MRFGo/global"
-	"MRFGo/guid"
 	"fmt"
+	"mrfgo/global"
+	"mrfgo/guid"
 	"sync"
 	"time"
 )

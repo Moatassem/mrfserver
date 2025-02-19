@@ -1,4 +1,4 @@
-module MRFGo
+module mrfgo
 
 go 1.23.6
 

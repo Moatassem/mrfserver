@@ -1,10 +1,10 @@
 package guid
 
 import (
-	. "MRFGo/global"
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	. "mrfgo/global"
 )
 
 // Guid is a globally unique 16 byte identifier

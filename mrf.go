@@ -1,11 +1,11 @@
 package main
 
 import (
-	"MRFGo/global"
-	"MRFGo/prometheus"
-	"MRFGo/sip"
-	"MRFGo/webserver"
 	"fmt"
+	"mrfgo/global"
+	"mrfgo/prometheus"
+	"mrfgo/sip"
+	"mrfgo/webserver"
 	"net"
 	"os"
 )

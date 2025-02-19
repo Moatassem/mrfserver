@@ -1,7 +1,7 @@
 package sip
 
 import (
-	"MRFGo/global"
+	"mrfgo/global"
 )
 
 type MessageBody struct {

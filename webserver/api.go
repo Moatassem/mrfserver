@@ -1,11 +1,11 @@
 package webserver
 
 import (
-	. "MRFGo/global"
-	"MRFGo/sip"
 	"encoding/json"
 	"fmt"
 	"log"
+	. "mrfgo/global"
+	"mrfgo/sip"
 	"net"
 	"net/http"
 	"runtime"

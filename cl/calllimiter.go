@@ -1,7 +1,7 @@
 package cl
 
 import (
-	"MRFGo/prometheus"
+	"mrfgo/prometheus"
 	"sync"
 	"time"
 )

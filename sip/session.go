@@ -1,14 +1,14 @@
 package sip
 
 import (
-	. "MRFGo/global"
-	"MRFGo/guid"
-	"MRFGo/sdp"
-	"MRFGo/sip/mode"
-	"MRFGo/sip/state"
 	"cmp"
 	"fmt"
 	"log"
+	. "mrfgo/global"
+	"mrfgo/guid"
+	"mrfgo/sdp"
+	"mrfgo/sip/mode"
+	"mrfgo/sip/state"
 	"net"
 	"runtime"
 	"sync"
@@ -813,7 +813,7 @@ func (session *SipSession) ProcessRequestHeaders(trans *Transaction, sipmsg *Sip
 	// PRACK specific headers
 	if sipmsg.StartLine.Method == PRACK && !session.IsPRACKSupported {
 		LogWarning(LTSIPStack, fmt.Sprintf("UAS requesting 100rel although not offered - Call ID [%s]", session.CallID))
-		hdrs.AddHeader(Warning, `399 MRFGo "100rel was not offered, yet it was requested"`)
+		hdrs.AddHeader(Warning, `399 mrfgo "100rel was not offered, yet it was requested"`)
 	}
 
 	// ReINVITE specific headers

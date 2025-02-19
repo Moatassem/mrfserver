@@ -1,12 +1,12 @@
 package sip
 
 import (
-	"MRFGo/global"
-	"MRFGo/numtype"
 	"bytes"
 	"cmp"
 	"encoding/hex"
 	"fmt"
+	"mrfgo/global"
+	"mrfgo/numtype"
 	"slices"
 	"strings"
 )

@@ -1,7 +1,7 @@
 package state
 
 import (
-	"MRFGo/global"
+	"mrfgo/global"
 	"strings"
 )
 

@@ -1,13 +1,13 @@
 package sip
 
 import (
-	. "MRFGo/global"
-	"MRFGo/q850"
-	"MRFGo/sip/mode"
-	"MRFGo/sip/state"
-	"MRFGo/sip/status"
 	"errors"
 	"fmt"
+	. "mrfgo/global"
+	"mrfgo/q850"
+	"mrfgo/sip/mode"
+	"mrfgo/sip/state"
+	"mrfgo/sip/status"
 	"strconv"
 	"strings"
 )

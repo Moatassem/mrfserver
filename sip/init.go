@@ -1,10 +1,10 @@
 package sip
 
 import (
-	"MRFGo/cl"
-	"MRFGo/global"
 	"fmt"
 	"log"
+	"mrfgo/cl"
+	"mrfgo/global"
 	"net"
 	"os"
 	"runtime"
