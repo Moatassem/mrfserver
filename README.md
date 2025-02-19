@@ -21,7 +21,7 @@ Notes below ports are exposed **by default**:
 
 ## Routing Logic
 
-- mrfgo has pools of directory number and associated audio files
+- mrfgo has pools of directory number/name and associated audio files
 - mrfgo supports PCMA, PCMU, G722 ... soon G729 and OPUS
 
 ## Environment Variables
