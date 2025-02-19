@@ -10,9 +10,9 @@
       "request": "launch",
       "program": "${workspaceFolder}/mrf.go",
       "env": {
-        "server_ipv4": "192.168.1.2",
-        "sip_udp_port": "5060",
-        "http_port": "8080",
+        // "server_ipv4": "192.168.1.2",
+        // "sip_udp_port": "5060",
+        // "http_port": "8080",
         "media_dir": ".\\audio"
         // server_ipv4=192.168.1.2 sip_udp_port=5060 http_port=8080 media_dir=.\\audio go run . -race
       }

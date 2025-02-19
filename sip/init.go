@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"runtime"
-	"strings"
 )
 
 var (
@@ -25,10 +24,6 @@ func StartServer(ipv4 string, sup, htp int) *net.UDPConn {
 	global.InitializeEngine()
 	fmt.Println("Ready!")
 
-	fmt.Printf("Loading files in directory: %s\n", global.MediaPath)
-	MRFRepos = NewMRFRepoCollection(global.MRFRepoName)
-	fmt.Printf("Audio files count: %d \n", MRFRepos.FilesCount(global.MRFRepoName))
-
 	triedAlready := false
 tryAgain:
 	fmt.Print("Attempting to listen on SIP...")
@@ -38,12 +33,9 @@ tryAgain:
 			fmt.Println(err)
 			os.Exit(2)
 		}
-		fmt.Printf("Error: %s\n", err)
-		if opErr, ok := err.(*net.OpError); ok && strings.Contains(opErr.Error(), "bind") {
-			global.ServerIPv4 = getlocalIPv4()
-			triedAlready = true
-			goto tryAgain
-		}
+		global.ServerIPv4 = getlocalIPv4(true)
+		triedAlready = true
+		goto tryAgain
 	}
 	MediaPorts = NewMediaPortPool()
 
@@ -55,10 +47,14 @@ tryAgain:
 	global.CallLimiter = cl.NewCallLimiter(global.RateLimit, global.Prometrics, &global.WtGrp)
 	fmt.Printf("OK (%d)\n", global.RateLimit)
 
+	fmt.Printf("Loading files in directory: %s\n", global.MediaPath)
+	MRFRepos = NewMRFRepoCollection(global.MRFRepoName)
+	fmt.Printf("Audio files loaded: %d \n", MRFRepos.FilesCount(global.MRFRepoName))
+
 	return serverUDPListener
 }
 
-func getlocalIPv4() net.IP {
+func getlocalIPv4(getfirst bool) net.IP {
 	fmt.Print("Checking Interfaces...")
 	serverIPs, err := global.GetLocalIPs()
 	if err != nil {
@@ -76,19 +72,24 @@ func getlocalIPv4() net.IP {
 			for i, s := range serverIPs {
 				fmt.Printf("%d- %s\n", i+1, s.String())
 			}
-			fmt.Print("Your choice:? ")
-			n, err := fmt.Scanln(&idx)
-			if n == 0 {
-				log.Panic("no proper interface selected")
-			}
-			if idx <= 0 || idx > len(serverIPs) {
-				fmt.Println("Invalid interface selected")
-				continue
-			}
-			if err == nil {
+			if getfirst {
+				idx = 1
 				break
+			} else {
+				fmt.Print("Your choice:? ")
+				n, err := fmt.Scanln(&idx)
+				if n == 0 {
+					log.Panic("no proper interface selected")
+				}
+				if idx <= 0 || idx > len(serverIPs) {
+					fmt.Println("Invalid interface selected")
+					continue
+				}
+				if err == nil {
+					break
+				}
+				fmt.Println(err)
 			}
-			fmt.Println(err)
 		}
 		serverIP = serverIPs[idx-1]
 		fmt.Println("Selected:", serverIP)

@@ -50,6 +50,9 @@ outer:
 }
 
 func StartListening(ip net.IP, prt int) (*net.UDPConn, error) {
+	if ip == nil {
+		return nil, errors.New("nil IP address")
+	}
 	var socket net.UDPAddr
 	socket.IP = ip
 	socket.Port = prt

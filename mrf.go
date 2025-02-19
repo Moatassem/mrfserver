@@ -34,33 +34,46 @@ func main() {
 }
 
 func greeting() {
-	global.LogInfo(global.LTSystem, fmt.Sprintf("Welcome to %s - Product of %s 2025\n", global.B2BUAName, global.ASCIIPascal(global.EntityName)))
+	global.LogInfo(global.LTSystem, fmt.Sprintf("Welcome to %s - Product of %s 2025", global.B2BUAName, global.ASCIIPascal(global.EntityName)))
 }
 
 func checkArgs() (string, int, int) {
 	ipv4, ok := os.LookupEnv(OwnIPv4)
 	if !ok {
-		global.LogError(global.LTConfiguration, "No self IPv4 address provided!")
+		global.LogWarning(global.LTConfiguration, "No self IPv4 address provided - First available shall be used")
 	}
 
 	global.ServerIPv4 = net.ParseIP(ipv4)
 
-	sup := os.Getenv(OwnSIPUdpPort)
+	sup, ok := os.LookupEnv(OwnSIPUdpPort)
 	minS := 4999
 	maxS := 6000
-	sipuport, ok := global.Str2IntDefaultMinMax(sup, global.DefaultSipPort, minS, maxS)
+
+	var sipuport, httpport int
 
 	if !ok {
-		global.LogWarning(global.LTConfiguration, "Invalid SIP UDP port: "+sup)
+		global.LogWarning(global.LTConfiguration, fmt.Sprintf("No self SIP UDP port provided - %d shall be used", global.DefaultSipPort))
+		sipuport = global.DefaultSipPort
+	} else {
+		sipuport, ok = global.Str2IntDefaultMinMax(sup, global.DefaultSipPort, minS, maxS)
+		if !ok {
+			global.LogWarning(global.LTConfiguration, "Invalid SIP UDP port: "+sup)
+		}
 	}
 
-	hp := os.Getenv(OwnHttpPort)
-	minH := 79
-	maxH := 9999
-	httpport, ok := global.Str2IntDefaultMinMax(hp, global.DefaultHttpPort, minH, maxH)
+	hp, ok := os.LookupEnv(OwnHttpPort)
 
 	if !ok {
-		global.LogWarning(global.LTConfiguration, "Invalid HTTP port: "+hp)
+		global.LogWarning(global.LTConfiguration, fmt.Sprintf("No self HTTP port provided - %d shall be used", global.DefaultHttpPort))
+		httpport = global.DefaultHttpPort
+	} else {
+		minH := 79
+		maxH := 9999
+		httpport, ok = global.Str2IntDefaultMinMax(hp, global.DefaultHttpPort, minH, maxH)
+
+		if !ok {
+			global.LogWarning(global.LTConfiguration, "Invalid HTTP port: "+hp)
+		}
 	}
 
 	mp, ok := os.LookupEnv(MediaDirectory)
