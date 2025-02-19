@@ -22,15 +22,24 @@ Notes below ports are exposed **by default**:
 
 ## Environment Variables
 
-Environment variables must be defined in order to launch SR container.
+Environment variables must be defined in order to launch MRFGo container.
 
 -e server_ipv4="#.#.#.#:####"
 
--e media_path="..." path for the directory holding the raw PCM files "sox --clobber --no-glob "dir" -e signed-integer -b 16 -c 1 -r 16000 "\*.raw" speed 2
+-e media_path="..." path for the directory holding the raw PCM files
 
 -e sip_udp_port="5060" (optional)
 
 -e http_port="8080" (optional)
+
+## Notes
+
+Use SoX: https://en.wikipedia.org/wiki/SoX
+
+- For Windows: https://sourceforge.net/projects/sox/
+- For Linux/Ubuntu: https://manpages.ubuntu.com/manpages/focal/man1/sox.1.html
+- Syntax: "sox --clobber --no-glob "<audiofile>" -e signed-integer -b 16 -c 1 -r 16000 "<audiofile>.raw" speed 2
+- Throw in the generates raw files inside the Media Directory and MRFGo will read them during startup
 
 ## Author
 

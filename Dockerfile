@@ -1,15 +1,23 @@
-FROM dockerproxy.repos.tech.orange/golang:alpine AS build
-LABEL maintainer="moatassem.talaat@orange.com"
+FROM golang:alpine AS build
+LABEL maintainer="eng.moatassem@gmail.com"
 
 WORKDIR /mrfgo
 
-# pre-copy/cache go.mod for pre-downloading dependencies and only redownloading them in subsequent builds if they change
 COPY go.mod go.sum ./
 RUN go mod download
 RUN go mod verify
 
 COPY . .
 RUN go build -o mrfgo .
+
+FROM alpine AS run
+LABEL maintainer="eng.moatassem@gmail.com"
+
+RUN mkdir /mrfgo
+
+COPY --from=build /mrfgo/mrfgo /mrfgo/mrfgo
+
+WORKDIR /mrfgo
 
 CMD ["./mrfgo"]
 

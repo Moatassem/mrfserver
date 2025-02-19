@@ -20,4 +20,5 @@ linters:
     - dupl # because too much factorisation reduces readability
     - exportloopref # deprecated
     - ireturn
+    - godot
   enable-all: true

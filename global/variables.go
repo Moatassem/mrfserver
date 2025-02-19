@@ -1,17 +1,3 @@
-/*
-# Software Name : Media Resource Function Server (SR)
-# SPDX-FileCopyrightText: Copyright (c) Orange Business - OINIS/Services/NSF
-# SPDX-License-Identifier: Apache-2.0
-#
-# This software is distributed under the Apache-2.0
-# See the "LICENSES" directory for more details.
-#
-# Authors:
-# - Moatassem Talaat <moatassem.talaat@orange.com>
-
----
-*/
-
 package global
 
 import (
@@ -23,12 +9,15 @@ import (
 )
 
 const (
-	EntityName = "OINIS-NSF"
+	EntityName = "MT-Tools"
 	B2BUAName  = "MRFGo/1.0"
 
 	MRFRepoName = "ivr"
 
 	BufferSize int = 4096
+
+	DefaultSipPort  int = 5060
+	DefaultHttpPort int = 8080
 
 	RTPHeaderSize  int = 12
 	RTPPayloadSize int = 160
