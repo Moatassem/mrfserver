@@ -383,15 +383,11 @@ func (ss *SipSession) parseXMLnPlay(bytes []byte, bt BodyType) (int, string) {
 	if len(audio) == 0 {
 		return 400, "No defined prompt audio in MSC request"
 	}
-	// pcmbytes, ok := ss.MRFRepo.Get(audio[0].URL)
-	// if !ok {
-	// 	return 400, "Requested MSC prompt audio not found or empty"
-	// }
 	ss.stopRTPStreaming()
 	go func() {
 		tmNow := time.Now()
 	loop:
-		stopped := false
+		isStopped := false
 		for i := 0; i < len(audio); i++ {
 			url := audio[i].URL
 			pcmbytes, ok := ss.MRFRepo.Get(url)
@@ -399,29 +395,27 @@ func (ss *SipSession) parseXMLnPlay(bytes []byte, bt BodyType) (int, string) {
 				LogWarning(LTConfiguration, fmt.Sprintf("Requested MSC prompt audio [%s] not found or empty in Repo [%s] - Call ID [%s]", url, ss.MRFRepo.name, ss.CallID))
 				continue
 			}
-			if stopped = ss.startRTPStreaming(pcmbytes, true, loopflag, false); stopped {
+			if isStopped = ss.startRTPStreaming(pcmbytes, true, loopflag, false); isStopped {
 				break
 			}
 		}
-		if !ss.IsDisposed {
-			if loopflag {
-				goto loop
-			}
-			var txt, dtmf string
-			if stopped {
-				txt = "interrupted"
-				dtmf = ""
-			} else {
-				txt = "timeout"
-				dtmf = ss.lastDTMF
-			}
-			mresp := NewMSCResponse(int(time.Since(tmNow).Milliseconds()), 200, txt, "The request has succeeded", rqstnm, dtmf)
-			mrespBytes, err := xml.Marshal(mresp)
-			if err != nil {
-
-			}
-			ss.SendRequest(INFO, nil, NewMSCXML(mrespBytes))
+		if ss.IsDisposed {
+			return
 		}
+		if loopflag {
+			goto loop
+		}
+		var txt, dtmf string
+		if isStopped {
+			txt = "interrupted"
+			dtmf = ""
+		} else {
+			txt = "timeout"
+			dtmf = ss.lastDTMF
+		}
+		mresp := NewMSCResponse(int(time.Since(tmNow).Milliseconds()), 200, txt, "The request has succeeded", rqstnm, dtmf)
+		mrespBytes, _ := xml.Marshal(mresp)
+		ss.SendRequest(INFO, nil, NewMSCXML(mrespBytes))
 	}()
 	return 200, ""
 }
