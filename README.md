@@ -14,7 +14,7 @@
 
 ## Service Details
 
-Notes below ports are exposed **by default**:
+Note: below ports are exposed **by default**:
 
 - UDP 5060 for SIP
 - TCP 8080 for HTTP Web API + Prometheus integration
