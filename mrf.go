@@ -51,8 +51,7 @@ func checkArgs() (string, int, int) {
 	sipuport, ok := global.Str2IntDefaultMinMax(sup, global.DefaultSipPort, minS, maxS)
 
 	if !ok {
-		global.LogError(global.LTConfiguration, "Invalid SIP UDP port: "+sup)
-		os.Exit(1)
+		global.LogWarning(global.LTConfiguration, "Invalid SIP UDP port: "+sup)
 	}
 
 	hp := os.Getenv(OwnHttpPort)
@@ -61,15 +60,14 @@ func checkArgs() (string, int, int) {
 	httpport, ok := global.Str2IntDefaultMinMax(hp, global.DefaultHttpPort, minH, maxH)
 
 	if !ok {
-		global.LogError(global.LTConfiguration, "Invalid HTTP port: "+hp)
-		os.Exit(1)
+		global.LogWarning(global.LTConfiguration, "Invalid HTTP port: "+hp)
 	}
 
 	mp, ok := os.LookupEnv(MediaDirectory)
 	if ok {
 		global.MediaPath = mp
 	} else {
-		global.LogWarning(global.LTConfiguration, "No media directory provided!")
+		global.LogError(global.LTConfiguration, "No media directory provided!")
 		os.Exit(1)
 	}
 
