@@ -9,16 +9,12 @@ linters:
   disable:
     - depguard
     - gci
-    # - gofumpt
-    # - govet
     - varnamelen
-    - wrapcheck # because it's simply stupid
+    - wrapcheck
     - funlen
-    - lll # because it's 21st century
-    # - execinquery # deprecated
-    # - gomnd # deprecated
-    - dupl # because too much factorisation reduces readability
-    - exportloopref # deprecated
+    - lll
+    - dupl
+    - exportloopref
     - ireturn
     - godot
   enable-all: true

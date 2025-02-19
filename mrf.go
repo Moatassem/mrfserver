@@ -17,8 +17,8 @@ const (
 	OwnIPv4       string = "server_ipv4"
 	OwnSIPUdpPort string = "sip_udp_port"
 	//nolint:stylecheck
-	OwnHttpPort string = "http_port"
-	MediaPath   string = "media_path"
+	OwnHttpPort    string = "http_port"
+	MediaDirectory string = "media_dir"
 )
 
 func main() {
@@ -66,7 +66,7 @@ func checkArgs() (string, int, int) {
 		os.Exit(1)
 	}
 
-	mp, ok := os.LookupEnv(MediaPath)
+	mp, ok := os.LookupEnv(MediaDirectory)
 	if ok {
 		global.MediaPath = mp
 	} else {

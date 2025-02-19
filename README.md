@@ -26,7 +26,7 @@ Environment variables must be defined in order to launch MRFGo container.
 
 -e server_ipv4="#.#.#.#:####"
 
--e media_path="..." path for the directory holding the raw PCM files
+-e media_dir="..." path for the directory holding the raw PCM files
 
 -e sip_udp_port="5060" (optional)
 
