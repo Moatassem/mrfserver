@@ -20,9 +20,10 @@ const (
 var MRFRepos *MRFRepoCollection
 
 type MRFRepo struct {
-	name string
-	mu   sync.RWMutex
-	data map[string][]int16
+	name    string
+	mu      sync.RWMutex
+	pcmdata map[string][]int16
+	txdata  map[string]map[uint8][]byte
 }
 
 type MRFRepoCollection struct {
@@ -54,7 +55,7 @@ func getExtension(fn string) string {
 
 func loadMedia(rn string) map[string]*MRFRepo {
 	mrfrepos := make(map[string]*MRFRepo)
-	mrfrepo := MRFRepo{name: rn, data: make(map[string][]int16)}
+	mrfrepo := MRFRepo{name: rn, pcmdata: make(map[string][]int16), txdata: make(map[string]map[uint8][]byte)}
 	mrfrepos[rn] = &mrfrepo
 
 	dentries, err := os.ReadDir(global.MediaPath)
@@ -73,6 +74,7 @@ func loadMedia(rn string) map[string]*MRFRepo {
 		var rawpath string
 
 		filenameonly := dropExtension(filename)
+		var comment string
 
 		switch ext := getExtension(filename); ext {
 		case ExtRaw:
@@ -81,6 +83,7 @@ func loadMedia(rn string) map[string]*MRFRepo {
 			rawpath, err = rtp.RunSox(global.MediaPath, filename, filenameonly)
 			if err == nil {
 				pcmBytes, err = rtp.ReadPCMRaw(rawpath)
+				comment = " (converted and deleted)"
 			}
 		default:
 			fmt.Printf("Filename: %s - Unsupported Extension: %s - Skipped\n", filename, ext)
@@ -95,9 +98,10 @@ func loadMedia(rn string) map[string]*MRFRepo {
 		// Calculate duration -- TODO duration not accurate vs playback duration
 		duration := float64(len(pcmBytes)) / global.PcmSamplingRate
 
-		fmt.Printf("Filename: %s, Duration: %s\n", filename, formattedTime(duration))
+		fmt.Printf("Filename: %s%s, Duration: %s\n", filename, comment, formattedTime(duration))
 
-		mrfrepo.data[filenameonly] = pcmBytes
+		mrfrepo.pcmdata[filenameonly] = pcmBytes
+		mrfrepo.txdata[filenameonly] = make(map[uint8][]byte)
 	}
 
 	return mrfrepos
@@ -130,31 +134,47 @@ func (mrfrps *MRFRepoCollection) GetMRFRepo(upart string) (*MRFRepo, bool) {
 	return mrfrp, ok
 }
 
-func (mrfrps *MRFRepoCollection) Get(upart, key string) ([]int16, bool) {
+func (mrfrps *MRFRepoCollection) AudioFileExists(upart, key string) bool {
 	mrfrps.mu.RLock()
 	defer mrfrps.mu.RUnlock()
 	if mp, ok := mrfrps.repos[upart]; ok {
-		return mp.Get(key)
+		return mp.AudioFileExists(key)
 	}
-	return nil, false
+	return false
 }
 
-func (mrfrp *MRFRepo) Get(key string) ([]int16, bool) {
+func (mrfrp *MRFRepo) AudioFileExists(key string) bool {
 	mrfrp.mu.RLock()
 	defer mrfrp.mu.RUnlock()
-	if pcm, ok := mrfrp.data[key]; ok {
+	if pcm, ok := mrfrp.pcmdata[key]; ok {
 		if len(pcm) == 0 {
-			return nil, false
+			return false
 		}
-		return pcm, ok
+		return ok
 	}
-	return nil, false
+	return false
+}
+
+func (mrfrp *MRFRepo) GetTx(key string, codec uint8) ([]byte, byte, bool) {
+	mrfrp.mu.Lock()
+	defer mrfrp.mu.Unlock()
+	silence := rtp.GetSilence(codec)
+	txdata, ok := mrfrp.txdata[key]
+	if !ok {
+		return nil, 0, false
+	}
+	txbytes, ok := txdata[codec]
+	if !ok {
+		txbytes = rtp.EncodePCM(mrfrp.pcmdata[key], codec)
+		txdata[codec] = txbytes
+	}
+	return txbytes, silence, true
 }
 
 func (mrfrp *MRFRepo) FilesCount() int {
 	mrfrp.mu.RLock()
 	defer mrfrp.mu.RUnlock()
-	return len(mrfrp.data)
+	return len(mrfrp.pcmdata)
 }
 
 // func (mrfr *MRFRepoCollection) AddOrUpdate(upart, key string, bytes []int16) {

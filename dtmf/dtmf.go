@@ -1,7 +1,6 @@
 package dtmf
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -57,9 +56,9 @@ func DetectDTMF(samples []int16) string {
 	rowMaxIndex := maxIndex(rowPower)
 	colMaxIndex := maxIndex(colPower)
 
-	fmt.Printf("Threshold Power:\t\t\t\t%.2f\n", threshold)
-	fmt.Printf("Horizontal DTMF Frequency: %.0f with Power:\t%.2f\n", dtmfFrequencies[rowMaxIndex], rowPower[rowMaxIndex])
-	fmt.Printf("Vertical DTMF Frequency: %.0f with Power:\t%.2f\n", dtmfFrequencies[colMaxIndex+4], colPower[colMaxIndex])
+	// fmt.Printf("Threshold Power:\t\t\t\t%.2f\n", threshold)
+	// fmt.Printf("Horizontal DTMF Frequency: %.0f with Power:\t%.2f\n", dtmfFrequencies[rowMaxIndex], rowPower[rowMaxIndex])
+	// fmt.Printf("Vertical DTMF Frequency: %.0f with Power:\t%.2f\n", dtmfFrequencies[colMaxIndex+4], colPower[colMaxIndex])
 
 	// Check if the detected power exceeds the threshold
 	if rowPower[rowMaxIndex] < threshold || colPower[colMaxIndex] < threshold {

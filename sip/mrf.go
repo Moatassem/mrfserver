@@ -294,7 +294,7 @@ func (ss *SipSession) mediaReceiver() {
 					if len(ss.PCMBytes) == DTMFPacketsCount*len(payload) {
 						ss.PCMBytes = append(ss.PCMBytes, payload...)
 						ss.NewDTMF = false
-						pcm := rtp.GetPCM(ss.PCMBytes, ss.rtpPayloadType)
+						pcm := rtp.DecodeToPCM(ss.PCMBytes, ss.rtpPayloadType)
 						signal := dtmf.DetectDTMF(pcm)
 						if signal != "" {
 							dtmf := DicDTMFEvent[DicDTMFSignal[signal]]
@@ -376,12 +376,12 @@ func (ss *SipSession) parseXMLnPlay(bytes []byte, bt BodyType) (int, string) {
 		isStopped := false
 		for i := 0; i < len(audio); i++ {
 			url := audio[i].URL
-			pcmbytes, ok := ss.MRFRepo.Get(url)
+			ok := ss.MRFRepo.AudioFileExists(url)
 			if !ok {
 				LogWarning(LTConfiguration, fmt.Sprintf("Requested MSC prompt audio [%s] not found or empty in Repo [%s] - Call ID [%s]", url, ss.MRFRepo.name, ss.CallID))
 				continue
 			}
-			if isStopped = ss.startRTPStreaming(pcmbytes, true, loopflag, false); isStopped {
+			if isStopped = ss.startRTPStreaming(url, true, loopflag, false); isStopped {
 				break
 			}
 		}
@@ -423,7 +423,7 @@ func (ss *SipSession) stopRTPStreaming() bool {
 	return false
 }
 
-func (ss *SipSession) startRTPStreaming(pcm []int16, resetflag, loopflag, dropCallflag bool) bool {
+func (ss *SipSession) startRTPStreaming(audiokey string, resetflag, loopflag, dropCallflag bool) bool {
 	ss.rtpmutex.Lock()
 	if ss.isrtpstreaming {
 		ss.rtpmutex.Unlock()
@@ -453,8 +453,8 @@ func (ss *SipSession) startRTPStreaming(pcm []int16, resetflag, loopflag, dropCa
 	isFinished := true // to know that streaming has reached its end
 
 	{
-		data, silence := rtp.TxPCMnSilence(pcm, ss.rtpPayloadType)
-		if data == nil {
+		data, silence, ok := ss.MRFRepo.GetTx(audiokey, origPayload)
+		if !ok {
 			goto finish1
 		}
 
@@ -476,7 +476,7 @@ func (ss *SipSession) startRTPStreaming(pcm []int16, resetflag, loopflag, dropCa
 			}
 
 			if origPayload != ss.rtpPayloadType {
-				defer ss.startRTPStreaming(pcm, false, loopflag, dropCallflag)
+				defer ss.startRTPStreaming(audiokey, false, loopflag, dropCallflag)
 				goto finish1
 			}
 

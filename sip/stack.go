@@ -450,8 +450,7 @@ func sipStack(sipmsg *SipMessage, ss *SipSession, newSesType NewSessionType) {
 				ss.StartMaxCallDuration()
 				ss.StartInDialogueProbing()
 				go ss.mediaReceiver()
-				// pcmbytes, _ := ss.MRFRepo.Get("CarelessWhisper")
-				// go ss.startRTPStreaming(pcmbytes, false, false, false)
+				go ss.startRTPStreaming("MaythekeshAleha", false, false, false)
 			} else { //ReINVITE
 				if trans.IsFinalResponsePositiveSYNC() {
 					ss.ChecknSetDialogueChanging(false)

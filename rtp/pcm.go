@@ -35,6 +35,9 @@ func RunSox(parentDir, filenamewithExt, filenameonly string) (string, error) {
 
 	// Run the command
 	err = cmd.Run()
+	if err == nil {
+		_ = os.Remove(filename)
+	}
 	return rawfilename, err
 }
 
