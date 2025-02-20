@@ -49,7 +49,7 @@ tryAgain:
 
 	fmt.Printf("Loading files in directory: %s\n", global.MediaPath)
 	MRFRepos = NewMRFRepoCollection(global.MRFRepoName)
-	fmt.Printf("Audio files loaded: %d \n", MRFRepos.FilesCount(global.MRFRepoName))
+	fmt.Printf("Audio files loaded: %d\n", MRFRepos.FilesCount(global.MRFRepoName))
 
 	return serverUDPListener
 }

@@ -1,12 +1,13 @@
 package dtmf
 
 import (
+	"fmt"
 	"math"
 )
 
 const (
 	// blockSize  = 480  // 3 RTP packets i.e. 160 x 3 = 480 bytes // Block size for DTMF detection (2 RTP packets = 320 samples)
-	threshold = 1e5 // Power threshold for DTMF detection
+	threshold = 1e11 // Power threshold for DTMF detection 1e5
 )
 
 var (
@@ -55,6 +56,10 @@ func DetectDTMF(samples []int16) string {
 
 	rowMaxIndex := maxIndex(rowPower)
 	colMaxIndex := maxIndex(colPower)
+
+	fmt.Printf("Threshold Power:\t\t\t\t%.2f\n", threshold)
+	fmt.Printf("Horizontal DTMF Frequency: %.0f with Power:\t%.2f\n", dtmfFrequencies[rowMaxIndex], rowPower[rowMaxIndex])
+	fmt.Printf("Vertical DTMF Frequency: %.0f with Power:\t%.2f\n", dtmfFrequencies[colMaxIndex+4], colPower[colMaxIndex])
 
 	// Check if the detected power exceeds the threshold
 	if rowPower[rowMaxIndex] < threshold || colPower[colMaxIndex] < threshold {
